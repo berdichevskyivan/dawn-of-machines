@@ -63,7 +63,14 @@ io.on('connection', (socket) => {
                     electricity: 10
                 }
             ],
-            board: Array.from({length: 100}, (_, i) => { return { id:i } }), // board is an array of tiles (tile object) (define tile object) Now we return empty object, but we will later or here do other calculations
+            board: Array.from({length: 100}, (_, i) => ({ 
+                id: i,
+                x: i % 10,
+                z: Math.floor(i / 10),
+                resource: null,
+                unit: null,
+                building: null,
+            })), // board is an array of tiles (tile object) (define tile object) Now we return empty object, but we will later or here do other calculations
             resources: [], // define the resource object. These are the world resources. We add resources after creating the game
         };
 
