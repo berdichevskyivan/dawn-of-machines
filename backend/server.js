@@ -43,6 +43,12 @@ io.on('connection', (socket) => {
         // startingTime and "timeToResolve" are different things. startingTime is when the action started, and timeToResolve is how long should this action take
         // like this, we will manage the "actions" that occur on the board. Here, action is inpersonal, actions array carries ALL actions 
 
+        // TODO: units and buildings will be universal. What this means is as follows
+        // there will be NO units and buildings in each player , instead
+        // there will be a global units, and each of those units will tell you if: a) its owned by a player, b) its part of the world. If its owned by a player, it will tell you its UNIQUE id which is its playerSocketId
+        // when selecting units, logic is: if you own those units, you CAN select them, if not , you can't . 
+        // this will allow local and global units and buildings to coexist coherently
+
         const game = {
             title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
             room: gameRoomName,
@@ -54,22 +60,11 @@ io.on('connection', (socket) => {
                 {
                     name: 'Player 1',
                     playerSocketId: socket.id,
-                    units: [
-                        {
-                            name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
-                        }
-                    ],
-                    buildings: [
-                        {
-                            name: 'Assembly Plant'
-                        },
-                        {
-                            name: 'Generator'
-                        }
-                    ],
-                    iron: 10,
-                    carbon: 0,
-                    electricity: 10
+                    resources: {
+                        iron: 10,
+                        carbon: 0,
+                        electricity: 10
+                    },
                 }
             ],
             board: Array.from({length: 100}, (_, i) => ({ 
@@ -81,6 +76,25 @@ io.on('connection', (socket) => {
                 building: null,
             })), // board is an array of tiles (tile object) (define tile object) Now we return empty object, but we will later or here do other calculations
             resources: [], // define the resource object. These are the world resources. We add resources after creating the game
+            units: [
+                {
+                    id: 0,
+                    name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
+                    player: socket.id, // IMPORTANT: if player is null, it means its NOT controlled by ANY player.
+                }
+            ], // TODO: add coordinates
+            buildings: [
+                {
+                    id: 0,
+                    name: 'Assembly Plant',
+                    player: socket.id,
+                },
+                {
+                    id: 1,
+                    name: 'Generator',
+                    player: socket.id,
+                }
+            ],
         };
 
         // here, we add resources, and also run functions and calculations to populate the board, place the players, place the units, etc
