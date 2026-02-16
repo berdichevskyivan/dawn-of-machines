@@ -1,0 +1,13 @@
+.games-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    height: 80%;
+    width: 100%;
+}
+
+.games-card {
+    height: fit-content;
+    width: fit-content;
+    border: 1px solid black;
+}

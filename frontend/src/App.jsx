@@ -9,12 +9,6 @@ function App() {
   useEffect(()=>{
     socket.connect();
 
-    socket.on('back-signal', (data)=>{
-      console.log('we received a signal back from server');
-      console.log('data we received from server: ', data);
-      console.log('Client Time: ', new Date(Date.now()));
-    })
-
     return () => {
       socket.disconnect();
     }
