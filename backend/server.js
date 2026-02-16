@@ -11,6 +11,7 @@ const io = new Server(server, {
 });
 
 const games = []; // this array contains all the currently active games
+const intervals = []; // this array contains the started intervalsID so they can be promptly removed when finished OR stalled
 
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -25,12 +26,46 @@ io.on('connection', (socket) => {
     socket.on('start-game', () => {
         // we received a 'start-game' event from THIS socket(this is relevant, we must know WHICH socket initiated this, that's our Player 1)
         // here, we create a game, right now, straight up, in the future we automatically check for credentials, etc
+
+        // For now, the socket that called start-game joins the room, the room is called based on the length of the games, that's it.
+        const gameRoomName = `game-room-${(games.length+1).toString()}`;
+
+        // later we verify if this gameRoomName already exist by iterating over games
+        // remember to also START THE CLOCK <- Super important. Start keeping track of time.
+
+        socket.join(gameRoomName);
+
+        // remember to later call socket.leave(gameRoomName) or socket.leave(game.room)
+
         const game = {
             title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
-            players: [{}], // define the player object // we start with already ONE player, so include the object there
+            room: gameRoomName,
+            startingSocketId: socket.id,
+            players: [
+                {
+                    name: 'Player 1',
+                    playerSocketId: socket.id,
+                    units: [
+                        {
+                            name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
+                        }
+                    ],
+                    buildings: [
+                        {
+                            name: 'Assembly Plant'
+                        },
+                        {
+                            name: 'Generator'
+                        }
+                    ],
+                    iron: 10,
+                    carbon: 0,
+                    electricity: 10
+                }
+            ],
             board: Array.from({length: 100}, (_, i) => { return { id:i } }), // board is an array of tiles (tile object) (define tile object) Now we return empty object, but we will later or here do other calculations
             resources: [], // define the resource object. These are the world resources. We add resources after creating the game
-        }
+        };
 
         // here, we add resources, and also run functions and calculations to populate the board, place the players, place the units, etc
 
