@@ -48,7 +48,8 @@ io.on('connection', (socket) => {
             room: gameRoomName,
             startingTime: Date.now(), // Time. Each object or process has its own startingTime
             startingSocketId: socket.id,
-            intervals: [], // every game has its own set of intervals. Intervals are objects that NOT only have their intervalID but ALSO describe what chain of events occurs within their scope. Define `interval` object
+            intervals: [], // every game has its own set of intervals
+            actions: [], // all actions in the game occur here. The main interval checks it every 50ms
             players: [
                 {
                     name: 'Player 1',
