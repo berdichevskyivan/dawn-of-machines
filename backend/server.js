@@ -11,7 +11,6 @@ const io = new Server(server, {
 });
 
 const games = []; // this array contains all the currently active games
-const intervals = []; // this array contains the started intervalsID so they can be promptly removed when finished OR stalled
 
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -20,14 +19,14 @@ io.on('connection', (socket) => {
     });
 
     socket.on('games-fetch', () => {
-        io.emit('games-update', games);
+        io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
     });
 
-    socket.on('start-game', () => {
-        // we received a 'start-game' event from THIS socket(this is relevant, we must know WHICH socket initiated this, that's our Player 1)
+    socket.on('game-start', () => {
+        // we received a 'game-start' event from THIS socket(this is relevant, we must know WHICH socket initiated this, that's our Player 1)
         // here, we create a game, right now, straight up, in the future we automatically check for credentials, etc
 
-        // For now, the socket that called start-game joins the room, the room is called based on the length of the games, that's it.
+        // For now, the socket that called game-start joins the room, the room is called based on the length of the games, that's it.
         const gameRoomName = `game-room-${(games.length+1).toString()}`;
 
         // later we verify if this gameRoomName already exist by iterating over games
@@ -37,10 +36,19 @@ io.on('connection', (socket) => {
 
         // remember to later call socket.leave(gameRoomName) or socket.leave(game.room)
 
+        // every process that starts has an intervalId AND a starting time
+        // an action has a starting time. Lets say we start "an action", put it in the `actions` array (this is NOT the intervals array, those contain intervalIds and other things)
+        // so, the interval, lets say, every 50ms, checks the action array. If the action is `resolved` , it REMOVES the action from the action array, cleaning it
+        // an action takes a SET amount of time, so it takes the startingTime of the action, and compares to Date.now() -> Date.now() - startingTime = has much time passed
+        // startingTime and "timeToResolve" are different things. startingTime is when the action started, and timeToResolve is how long should this action take
+        // like this, we will manage the "actions" that occur on the board. Here, action is inpersonal, actions array carries ALL actions 
+
         const game = {
             title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
             room: gameRoomName,
+            startingTime: Date.now(), // Time. Each object or process has its own startingTime
             startingSocketId: socket.id,
+            intervals: [], // every game has its own set of intervals. Intervals are objects that NOT only have their intervalID but ALSO describe what chain of events occurs within their scope. Define `interval` object
             players: [
                 {
                     name: 'Player 1',
@@ -76,10 +84,13 @@ io.on('connection', (socket) => {
 
         // here, we add resources, and also run functions and calculations to populate the board, place the players, place the units, etc
 
+        // When everything is in place, we start our first interval, this is the main game's clock.
+        // The other intervals relate to other processes and they must be stopped and closed but there is only ONE game main interval
+
         // for now, we move onto just adding this bare bones game object to see it show in the /games page
         games.push(game);
 
-        io.emit('games-update', games);
+        io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
     })
 })
 

@@ -30,7 +30,8 @@ function Games({socket}) {
         <div className="games-container">
         { games.length > 0 && games.map((game, index)=>{ return (
           <div className="games-card" key={`game-${index}`}>
-            <h1>Title: {game.title}</h1>
+            <h1>{game.title}</h1>
+            <button>Join Game</button>
           </div>
         )})}
         </div>
