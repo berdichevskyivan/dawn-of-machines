@@ -101,11 +101,18 @@ io.on('connection', (socket) => {
 
         // When everything is in place, we start our first interval, this is the main game's clock.
         // The other intervals relate to other processes and they must be stopped and closed but there is only ONE game main interval
+        // We START the main interval and THAT interval will send a signal. 
+        // This signal reaches the client, changes the state there and THAT is visualized 
 
         // for now, we move onto just adding this bare bones game object to see it show in the /games page
         games.push(game);
 
+        // we tell all clients a game has started can be viewed in /games page
         io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
+
+        // we give the player that started the necesary data to start the game
+        // later we differentiate the data we can send or not, for now, it can be cleanly sent
+        socket.emit('starting-game-data', game);
     })
 })
 

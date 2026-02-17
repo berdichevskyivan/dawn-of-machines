@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router';
 import './TitleScreen.css'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function TitleScreen({socket}) {
   const [loading, setLoading] = useState(false);
@@ -13,10 +13,12 @@ function TitleScreen({socket}) {
     socket.emit('game-start');
     // wait here or in a useEffect for the bounce back of 'game-start', this means everything has been generated and processed,
     // in the meantime, here is where you place the logic to show the user a loading screen
-    // setLoading(true)
+    setLoading(true)
 
-    // for now, we navigate straight into the game room
-    navigate('/game-room');
+    socket.on('starting-game-data', (data) => {
+      setLoading(false);
+      navigate('/game-room', { state: { startingGameData: data } });
+    })
   }
 
   return (
