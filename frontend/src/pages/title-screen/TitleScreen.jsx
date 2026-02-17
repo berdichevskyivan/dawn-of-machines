@@ -7,18 +7,21 @@ function TitleScreen({socket}) {
 
   const navigate = useNavigate();
 
-  const startGame = () => {
-    // TODO: before we start the game, we need to check if this socket has already started a game.
-
-    socket.emit('game-start');
-    // wait here or in a useEffect for the bounce back of 'game-start', this means everything has been generated and processed,
-    // in the meantime, here is where you place the logic to show the user a loading screen
-    setLoading(true)
-
+  useEffect(() => {
     socket.on('starting-game-data', (data) => {
       setLoading(false);
       navigate('/game-room', { state: { startingGameData: data } });
     })
+
+    return () => {
+      socket.off('starting-game-data');
+    }
+  }, [])
+
+  const startGame = () => {
+    // TODO: before we start the game, we need to check if this socket has already started a game.
+    socket.emit('game-start');
+    setLoading(true);
   }
 
   return (

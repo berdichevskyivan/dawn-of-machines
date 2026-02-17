@@ -99,10 +99,8 @@ io.on('connection', (socket) => {
 
         // here, we add resources, and also run functions and calculations to populate the board, place the players, place the units, etc
 
-        // When everything is in place, we start our first interval, this is the main game's clock.
-        // The other intervals relate to other processes and they must be stopped and closed but there is only ONE game main interval
-        // We START the main interval and THAT interval will send a signal. 
-        // This signal reaches the client, changes the state there and THAT is visualized 
+        // start main interval. Each 50ms. resolves or removes (resolver doest the ACTUAL change, interval checks time and determines if enough has passed. Thats it.)
+        // store than main interval id somewhere for cleaning afterwards. The interval sends state changes to the player but ONLY the player data
 
         // for now, we move onto just adding this bare bones game object to see it show in the /games page
         games.push(game);
