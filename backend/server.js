@@ -20,39 +20,38 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                     building: null,
                                 }))
 
-const calculateSight = (x, z) => {
-    // returns an array of integers, the id of the tiles
-    const sightArray = [];
-    // this is where we are right now
-    sightArray.push({ x, z })
-    // this is right
-    sightArray.push({ x:x+1, z })
-    // this is left
-    sightArray.push({ x:x-1, z })
-    // this is top
-    sightArray.push({ x, z:z+1 })
-    // this is bottom
-    sightArray.push({ x, z:z-1 })
-    // this is top-right
-    sightArray.push({ x:x+1, z:z+1 })
-    // this is top-left
-    sightArray.push({ x:x-1, z:z+1 })
-    // this is bottom-right
-    sightArray.push({ x:x+1, z:z-1 })
-    // this is bottom-left
-    sightArray.push({ x:x-1, z:z-1 })
+const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
+    const deltas = [
+        [0, 0],   // self
+        [1, 0],   // right
+        [-1, 0],  // left
+        [0, 1],   // top
+        [0, -1],  // bottom
+        [1, 1],   // top-right
+        [-1, 1],  // top-left
+        [1, -1],  // bottom-right
+        [-1, -1]  // bottom-left
+    ];
 
-    console.log('sightArray: ', sightArray);
+    const sightTileIds = [];
 
-    const sightTileArray = sightArray.map(coordinate => {
-        const tile = boardTemplate.find(tile=>tile.x === coordinate.x && tile.z === coordinate.z);
-        console.log('tile is: ', tile);
-        return tile?.id;
-    }).filter(id => id !== undefined)
+    for (const [dx, dz] of deltas) {
+        const nx = x + dx;
+        const nz = z + dz;
 
-    console.log('sightTileArray is: ', sightTileArray);
+        // skip tiles that are outside the board
+        if (nx < 0 || nx >= boardWidth || nz < 0 || nz >= boardHeight) continue;
 
-    return sightTileArray;
+        // O(1) lookup
+        sightTileIds.push(boardTemplate[nz * boardWidth + nx].id);
+    }
+
+    return sightTileIds;
+};
+
+const calculatePosition = (x, z, boardWidth = 10) => {
+    if (x < 0 || x >= boardWidth || z < 0 || z >= boardWidth) return undefined;
+    return boardTemplate[z * boardWidth + x].id;
 }
 
 io.on('connection', (socket) => {
@@ -110,15 +109,8 @@ io.on('connection', (socket) => {
                     },
                 }
             ],
-            board: Array.from({length: 100}, (_, i) => ({ 
-                id: i,
-                x: i % 10,
-                z: Math.floor(i / 10),
-                resource: null,
-                unit: null,
-                building: null,
-            })), // board is an array of tiles (tile object) (define tile object) Now we return empty object, but we will later or here do other calculations
-            resources: [], // define the resource object. These are the world resources. We add resources after creating the game
+            board: [...boardTemplate],
+            resources: [], // define the resource object and coordinates
             units: [
                 {
                     id: 0,
@@ -127,8 +119,9 @@ io.on('connection', (socket) => {
                     sight: [],
                     x: 0,
                     z: 0,
+                    position: null,
                 }
-            ], // TODO: add coordinates
+            ],
             buildings: [
                 {
                     id: 0,
@@ -137,6 +130,7 @@ io.on('connection', (socket) => {
                     sight: [],
                     x: 1,
                     z: 1,
+                    position: null,
                 },
                 {
                     id: 1,
@@ -145,6 +139,7 @@ io.on('connection', (socket) => {
                     sight: [],
                     x: 2,
                     z: 2,
+                    position: null,
                 }
             ],
         };
@@ -156,6 +151,7 @@ io.on('connection', (socket) => {
             return {
                 ...u,
                 sight: calculateSight(u.x, u.z),
+                position: calculatePosition(u.x, u.z),
             }
         })
 
@@ -164,6 +160,7 @@ io.on('connection', (socket) => {
             return {
                 ...b,
                 sight: calculateSight(b.x, b.z),
+                position: calculatePosition(b.x, b.z),
             }
         })
 
@@ -175,12 +172,15 @@ io.on('connection', (socket) => {
         // for example, we need to calculate SIGHT for each unit. SIGHT will tell us which TILE they see. 
         // the Tile they see is calculated based on the X and Z of the object (unit or building) like x+1 x-1 z+1 z-1, then that matches an ID, THEN that id is pushed into an array called `sight` inside
         // the unit of building
-        const mainInterval = setInterval(()=>{
-            console.log('to test');
-        }, 50)
 
+        // UNCOMMENT WHEN READY
+        // const mainInterval = setInterval(()=>{
+        //     console.log('to test');
+        // }, 50)
+
+        // UNCOMMENT WHEN READY
         // push the main interval into the intervals array
-        game.intervals.push(mainInterval);
+        // game.intervals.push(mainInterval);
 
         // start main interval. Each 50ms. resolves or removes (resolver doest the ACTUAL change, interval checks time and determines if enough has passed. Thats it.)
         // store than main interval id somewhere for cleaning afterwards. The interval sends state changes to the player but ONLY the player data
