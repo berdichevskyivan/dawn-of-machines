@@ -67,11 +67,37 @@ function Tile({position, tile}){
     )
 }
 
+function Unit({position}){
+    const unitRef = useRef();
+
+    return (
+        <mesh ref={unitRef} position={[position[0], 0.5, position[2]]} rotation={[0, 0, 0]} scale={0.5}>
+            {/* arg here is: radius */}
+            <sphereGeometry args={[0.5]} />
+            <meshStandardMaterial color="yellow" />
+        </mesh>
+    )
+}
+
+function Building({position}){
+    const buildingRef = useRef();
+
+    return (
+        <mesh ref={buildingRef} position={[position[0], 0.5, position[2]]} rotation={[0, Math.PI / 4, 0]} scale={1}>
+            {/* arg here is: base radius, height, number of sides */}
+            <coneGeometry args={[0.5, 1, 4]} />
+            <meshStandardMaterial color="yellow" />
+        </mesh>
+    )
+}
+
 function GameRoom({socket}){
     const location = useLocation();
     const { startingGameData } = location.state || {};
 
     const [board, setBoard] = useState([]);
+    const [units, setUnits] = useState([]);
+    const [buildings, setBuildings] = useState([]);
 
     useEffect(()=>{
         // perfect. This is enough to construct the board for now
@@ -80,6 +106,10 @@ function GameRoom({socket}){
 
         if(startingGameData){
             setBoard(startingGameData.board);
+            // for now, we set the units straight but 
+            // we need to send from the backend ONLY the units for THIS socket/player
+            setUnits(startingGameData.units.filter(u => u.player && u.player !== socket.id));
+            setBuildings(startingGameData.buildings.filter(b => b.player && b.player !== socket.id));
         }
     }, []);
 
@@ -107,6 +137,16 @@ function GameRoom({socket}){
                 {/* Tiles */}
                 { board.length > 0 && board.map((tile, index) => (
                     <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile}/>
+                ))}
+
+                {/* Units */}
+                { units.length > 0 && units.map((unit, index) => (
+                    <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} />
+                ))}
+
+                {/* Buildings */}
+                { buildings.length > 0 && buildings.map((building, index) => (
+                    <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} />
                 ))}
 
                 {/* Controls */}
