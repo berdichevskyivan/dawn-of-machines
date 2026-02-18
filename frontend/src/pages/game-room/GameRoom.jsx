@@ -8,16 +8,11 @@ import './GameRoom.css';
 
 // Keep for example purposes
 // function Plane(props) {
-//   const meshRef = useRef()
 //   const [hovered, setHover] = useState(false)
 //   const [active, setActive] = useState(false)
 //   useFrame((state, delta) => (meshRef.current.rotation.x += delta))
 //   return (
 //     <mesh
-//       {...props}
-//       ref={meshRef}
-//       scale={active ? 1.5 : 1}
-//       onClick={(event) => setActive(!active)}
 //       onPointerOver={(event) => setHover(true)}
 //       onPointerOut={(event) => setHover(false)}>
 //       <planeGeometry args={[2, 2]} />
@@ -99,17 +94,41 @@ function GameRoom({socket}){
     const [units, setUnits] = useState([]);
     const [buildings, setBuildings] = useState([]);
 
-    useEffect(()=>{
-        // perfect. This is enough to construct the board for now
-        console.log('startingGameData: ', startingGameData);
-        console.log('socket: ', socket);
+    useEffect(() => {
+        const storedSocketId = localStorage.getItem('dom-player-socket');
+        const storedRoom = localStorage.getItem('dom-game-room');
 
-        if(startingGameData){
+        // If we have stored credentials, attempt reconnect
+        if (storedSocketId && storedRoom && storedSocketId !== socket.id) {
+                console.log('Reconnecting with:', storedSocketId, storedRoom);
+                socket.emit('player-reconnect', {
+                    originalSocketId: storedSocketId,
+                    gameRoom: storedRoom,
+                })
+        }
+
+        // Handle reconnect response or fresh game data
+        socket.on('starting-game-data', (data) => {
+            console.log('Received game data:', data);
+
+            // Update localStorage with current socket
+            localStorage.setItem('dom-player-socket', socket.id);
+            localStorage.setItem('dom-game-room', data.room);
+
+            setBoard(data.board);
+            setUnits(data.units.filter(u => u.player === socket.id));
+            setBuildings(data.buildings.filter(b => b.player === socket.id));
+        })
+
+        // If we have fresh game data from navigation, use it
+        if (startingGameData) {
             setBoard(startingGameData.board);
-            // for now, we set the units straight but 
-            // we need to send from the backend ONLY the units for THIS socket/player
-            setUnits(startingGameData.units.filter(u => u.player && u.player !== socket.id));
-            setBuildings(startingGameData.buildings.filter(b => b.player && b.player !== socket.id));
+            setUnits(startingGameData.units.filter(u => u.player === socket.id));
+            setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
+        }
+
+        return () => {
+            socket.off('starting-game-data');
         }
     }, []);
 

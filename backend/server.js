@@ -198,6 +198,36 @@ io.on('connection', (socket) => {
 
         socket.emit('starting-game-data', safeGameData);
     })
+
+    socket.on('player-reconnect', ({ originalSocketId, gameRoom }) => {
+        const game = games.find(g => g.room === gameRoom)
+        if (!game) return
+
+        const player = game.players.find(p => p.playerSocketId === originalSocketId)
+
+        if (player) {
+            // Update player socket
+            player.playerSocketId = socket.id
+            
+            // Update units owned by old socket
+            game.units.forEach(u => {
+            if (u.player === originalSocketId) {
+                u.player = socket.id
+            }
+            })
+            
+            // Update buildings owned by old socket
+            game.buildings.forEach(b => {
+            if (b.player === originalSocketId) {
+                b.player = socket.id
+            }
+            })
+            
+            socket.join(gameRoom)
+            socket.emit('starting-game-data', game)
+        }
+    })
+
 })
 
 server.listen(3000, () => {

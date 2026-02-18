@@ -9,6 +9,11 @@ function TitleScreen({socket}) {
 
   useEffect(() => {
     socket.on('starting-game-data', (data) => {
+
+      // Update localStorage with current socket ID
+      localStorage.setItem('dom-player-socket', socket.id);
+      localStorage.setItem('dom-game-room', data.room);
+
       setLoading(false);
       navigate('/game-room', { state: { startingGameData: data } });
     })
