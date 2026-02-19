@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
 
         // TODO: units and buildings will be universal. What this means is as follows
         // there will be NO units and buildings in each player , instead
-        // there will be a global units, and each of those units will tell you if: a) its owned by a player, b) its part of the world. If its owned by a player, it will tell you its UNIQUE id which is its playerSocketId
+        // there will be a global units, and each of those units will tell you if: a) its owned by a player, b) its part of the world. If its owned by a player, it will tell you its UNIQUE id which is its socketId
         // when selecting units, logic is: if you own those units, you CAN select them, if not , you can't . 
         // this will allow local and global units and buildings to coexist coherently
 
@@ -101,7 +101,7 @@ io.on('connection', (socket) => {
             players: [
                 {
                     name: 'Player 1',
-                    playerSocketId: socket.id,
+                    socketId: socket.id,
                     resources: {
                         iron: 10,
                         carbon: 0,
@@ -203,11 +203,11 @@ io.on('connection', (socket) => {
         const game = games.find(g => g.room === gameRoom)
         if (!game) return
 
-        const player = game.players.find(p => p.playerSocketId === originalSocketId)
+        const player = game.players.find(p => p.socketId === originalSocketId)
 
         if (player) {
             // Update player socket
-            player.playerSocketId = socket.id
+            player.socketId = socket.id
             
             // Update units owned by old socket
             game.units.forEach(u => {
