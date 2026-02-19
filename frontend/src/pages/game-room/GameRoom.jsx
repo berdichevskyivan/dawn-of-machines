@@ -86,6 +86,26 @@ function Building({position}){
     )
 }
 
+function Clock({ startingTime }) {
+    const [elapsed, setElapsed] = useState(Date.now() - startingTime);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setElapsed(Date.now() - startingTime);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [startingTime]);
+
+    const seconds = Math.floor(elapsed / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const displaySeconds = seconds % 60;
+
+    return (
+        <h1>{minutes}:{displaySeconds.toString().padStart(2, '0')}</h1>
+    )
+}
+
 function GameRoom({socket}){
     const location = useLocation();
     const { startingGameData } = location.state || {};
@@ -94,6 +114,7 @@ function GameRoom({socket}){
     const [units, setUnits] = useState([]);
     const [buildings, setBuildings] = useState([]);
     const [resources, setResources] = useState(null);
+    const [startingTime, setStartingTime] = useState(null);
 
     useEffect(() => {
         const storedSocketId = localStorage.getItem('dom-player-socket');
@@ -120,6 +141,7 @@ function GameRoom({socket}){
             setUnits(data.units.filter(u => u.player === socket.id));
             setBuildings(data.buildings.filter(b => b.player === socket.id));
             setResources(data.players.filter(p => p.socketId === socket.id)[0]?.resources);
+            setStartingTime(data.startingTime);
         })
 
         // Later remember, the client should, in theory, ONLY receive data related to IT (the player) not OTHER players
@@ -130,6 +152,7 @@ function GameRoom({socket}){
             setUnits(startingGameData.units.filter(u => u.player === socket.id));
             setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
             setResources(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.resources);
+            setStartingTime(startingGameData.startingTime);
         }
 
         return () => {
@@ -208,6 +231,25 @@ function GameRoom({socket}){
                             </svg>
                         </div>
                         <h1>{resources.carbon}</h1>
+                    </div>
+                    <div className="resource-field">
+                        <div className="icon">
+                            <svg className="time-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                {/* Circle */}
+                                <circle cx="10" cy="10" r="9" fill="none"/>
+
+                                {/* Three FROM center — clockwise */}
+                                <path d="M 10 10 Q 7 6 10 3" fill="none"/>
+                                <path d="M 10 10 Q 19 11 16.8 13.5" fill="none"/>
+                                <path d="M 10 10 Q 4 15 3.2 13.5" fill="none"/>
+
+                                {/* Three FROM circumference — counterclockwise */}
+                                <path d="M 10 19 Q 13 16 10 13" fill="none"/>
+                                <path d="M 2.2 5.5 Q 4 9 7.5 8.5" fill="none"/>
+                                <path d="M 17.8 5.5 Q 14 4 12.5 8.5" fill="none"/>
+                            </svg>
+                        </div>
+                        <Clock startingTime={startingTime}/>
                     </div>
                 </div>
             )}
