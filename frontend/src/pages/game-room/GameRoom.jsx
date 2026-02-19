@@ -144,7 +144,10 @@ function GameRoom({socket}){
             setStartingTime(data.startingTime);
         })
 
-        // Later remember, the client should, in theory, ONLY receive data related to IT (the player) not OTHER players
+        // Handles player-update
+        socket.on('player-update', (data) => {
+            setResources(data.playerData.resources);
+        })
 
         // If we have fresh game data from navigation, use it
         if (startingGameData) {
@@ -157,6 +160,7 @@ function GameRoom({socket}){
 
         return () => {
             socket.off('starting-game-data');
+            socket.off('player-update');
         }
     }, []);
 
@@ -175,7 +179,7 @@ function GameRoom({socket}){
                         <div className="icon">
                             <div className="electricity-icon" />
                         </div>
-                        <h1>{resources.electricity}</h1>
+                        <h1>{Number(resources.electricity.toFixed(1))}</h1>
                     </div>
                     <div className="resource-field">
                         <div className="icon">

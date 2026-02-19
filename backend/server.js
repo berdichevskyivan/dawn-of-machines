@@ -1,6 +1,7 @@
 const express = require('express');
 const { createServer } = require('node:http');
 const { Server } = require('socket.io');
+const { randomUUID } = require('crypto');
 
 const app = express();
 const server = createServer(app);
@@ -10,7 +11,9 @@ const io = new Server(server, {
     }
 });
 
-const games = []; // this array contains all the currently active games
+let games = []; // this array contains all the currently active games
+let intervals = []; // this array contains all the intervals related to games (linked by gameId)
+let sockets = []; // here we store the socketId and the socket itself
 const boardTemplate = Array.from({length: 100}, (_, i) => ({ 
                                     id: i,
                                     x: i % 10,
@@ -54,10 +57,38 @@ const calculatePosition = (x, z, boardWidth = 10) => {
     return boardTemplate[z * boardWidth + x].id;
 }
 
+const drainElectricity = (gameId) => {
+    const game = games.find(g => g.id === gameId);
+
+    game.players.forEach(player => {
+        // just existing drains a percentage, start with this
+        console.log('draining electricity from player ', player.name);
+        player.resources.electricity -= 0.1;
+        // check in the array of actions for actions belonging to THIS player
+
+        // then, for each player, we use their socket to emit, ONLY to THEIR socket
+        const playerSocket = sockets.find(s => s.socketId === player.socketId);
+        if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
+    })
+}
+
 io.on('connection', (socket) => {
-    console.log('a user connected');
+    console.log(`${socket.id} connected. Adding socket to global array of sockets.`);
+
+    // If it does NOT find the socket, push it
+    // If it finds it, skip
+    if(!sockets.find(s => s.socketId === socket.id)){
+        sockets.push({ socketId: socket.id, socket: socket })
+    }
+
     socket.on('disconnect', () => {
         console.log('user disconnected');
+        if(sockets.find(s => s.socketId === socket.id)){
+            // this is to give time for reconnection
+            setTimeout(()=>{
+                sockets = sockets.filter(s => s.socketId !== socket.id);
+            }, 2000)
+        }
     });
 
     socket.on('games-fetch', () => {
@@ -92,11 +123,11 @@ io.on('connection', (socket) => {
         // this will allow local and global units and buildings to coexist coherently
 
         const game = {
+            id: randomUUID(),
             title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
             room: gameRoomName,
             startingTime: Date.now(), // Time. Each object or process has its own startingTime
             startingSocketId: socket.id,
-            intervals: [], // every game has its own set of intervals
             actions: [], // all actions in the game occur here. The main interval checks it every 50ms
             players: [
                 {
@@ -105,7 +136,7 @@ io.on('connection', (socket) => {
                     resources: {
                         iron: 10,
                         carbon: 0,
-                        electricity: 10
+                        electricity: 100
                     },
                 }
             ],
@@ -173,14 +204,11 @@ io.on('connection', (socket) => {
         // the Tile they see is calculated based on the X and Z of the object (unit or building) like x+1 x-1 z+1 z-1, then that matches an ID, THEN that id is pushed into an array called `sight` inside
         // the unit of building
 
-        // UNCOMMENT WHEN READY
-        // const mainInterval = setInterval(()=>{
-        //     console.log('to test');
-        // }, 50)
+        const mainInterval = setInterval(()=>{
+            drainElectricity(game.id);
+        }, 50)
 
-        // UNCOMMENT WHEN READY
-        // push the main interval into the intervals array
-        // game.intervals.push(mainInterval);
+        intervals.push({gameId: game.id, interval: mainInterval});
 
         // start main interval. Each 50ms. resolves or removes (resolver doest the ACTUAL change, interval checks time and determines if enough has passed. Thats it.)
         // store than main interval id somewhere for cleaning afterwards. The interval sends state changes to the player but ONLY the player data
@@ -192,9 +220,9 @@ io.on('connection', (socket) => {
         io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
 
         // Neccesary data to start the board
-        // Remove intervals from client side data
+        // Remove id
         const safeGameData = { ...game };
-        delete safeGameData.intervals;
+        delete safeGameData.id;
 
         socket.emit('starting-game-data', safeGameData);
     })
@@ -208,6 +236,13 @@ io.on('connection', (socket) => {
         if (player) {
             // Update player socket
             player.socketId = socket.id
+
+            // Also update socket id in sockets array
+            // I see. The socket id immediately disconnects so we need to remove it from 
+            // the sockets array more slowly
+            const socketToUpdate = sockets.find(s => s.socketId === originalSocketId);
+            socketToUpdate.socketId = socket.id; // the new id
+            socketToUpdate.socket = socket; // the new socket itself
             
             // Update units owned by old socket
             game.units.forEach(u => {
