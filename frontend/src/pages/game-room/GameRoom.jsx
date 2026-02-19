@@ -175,85 +175,87 @@ function GameRoom({socket}){
         <div className="game-room-container">
             { resources && (
                 <div className="top-ui-bar">
-                    <div className="resource-field">
-                        <div className="icon">
-                            <div className="electricity-icon" />
+                    <div className="resources-section">
+                        <div className="resource-field">
+                            <div className="icon">
+                                <div className="electricity-icon" />
+                            </div>
+                            <h1 className="electricity-text">{Number(resources.electricity.toFixed(1))}</h1>
                         </div>
-                        <h1>{Number(resources.electricity.toFixed(1))}</h1>
-                    </div>
-                    <div className="resource-field">
-                        <div className="icon">
-                            <div className="iron-icon" />
+                        <div className="resource-field">
+                            <div className="icon">
+                                <div className="iron-icon" />
+                            </div>
+                            <h1>{resources.iron}</h1>
                         </div>
-                        <h1>{resources.iron}</h1>
-                    </div>
-                    <div className="resource-field">
-                        <div className="icon">
-                            <svg className="carbon-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <line x1="10" y1="10" x2="10" y2="0"/>
-                                <line x1="10" y1="10" x2="20" y2="5"/>
-                                <line x1="10" y1="10" x2="20" y2="15"/>
-                                <line x1="10" y1="10" x2="10" y2="20"/>
-                                <line x1="10" y1="10" x2="0" y2="15"/>
-                                <line x1="10" y1="10" x2="0" y2="5"/>
-                                {/* Inner ring */}
-                                {/* Endpoints at radius 3 from center (10,10). */}
-                                {/* Control points offset 1 unit inward from the midpoint between adjacent radial endpoints. */}
-                                {/* Six arcs, one per radial segment. */}
-                                <path d="M 10 7 Q 11 9 13 8" fill="none"/>
-                                <path d="M 13 8 Q 11 11 13 12" fill="none"/>
-                                <path d="M 13 12 Q 11 11 10 13" fill="none"/>
-                                <path d="M 10 13 Q 9 11 7 12" fill="none"/>
-                                <path d="M 7 12 Q 9 11 7 8" fill="none"/>
-                                <path d="M 7 8 Q 9 9 10 7" fill="none"/>
+                        <div className="resource-field">
+                            <div className="icon">
+                                <svg className="carbon-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="10" y1="10" x2="10" y2="0"/>
+                                    <line x1="10" y1="10" x2="20" y2="5"/>
+                                    <line x1="10" y1="10" x2="20" y2="15"/>
+                                    <line x1="10" y1="10" x2="10" y2="20"/>
+                                    <line x1="10" y1="10" x2="0" y2="15"/>
+                                    <line x1="10" y1="10" x2="0" y2="5"/>
+                                    {/* Inner ring */}
+                                    {/* Endpoints at radius 3 from center (10,10). */}
+                                    {/* Control points offset 1 unit inward from the midpoint between adjacent radial endpoints. */}
+                                    {/* Six arcs, one per radial segment. */}
+                                    <path d="M 10 7 Q 11 9 13 8" fill="none"/>
+                                    <path d="M 13 8 Q 11 11 13 12" fill="none"/>
+                                    <path d="M 13 12 Q 11 11 10 13" fill="none"/>
+                                    <path d="M 10 13 Q 9 11 7 12" fill="none"/>
+                                    <path d="M 7 12 Q 9 11 7 8" fill="none"/>
+                                    <path d="M 7 8 Q 9 9 10 7" fill="none"/>
 
-                                {/* Middle ring */}
-                                {/* Endpoints at radius 6 from center (10,10). */}
-                                {/* Control points offset 3 units inward from the midpoint between adjacent radial endpoints. */}
-                                {/* Six arcs, one per radial segment. */}
-                                <path d="M 10 4 Q 12 7 16 6" fill="none"/>
-                                <path d="M 16 6 Q 13 10 16 14" fill="none"/>
-                                <path d="M 16 14 Q 12 13 10 16" fill="none"/>
-                                <path d="M 10 16 Q 8 13 4 14" fill="none"/>
-                                <path d="M 4 14 Q 7 10 4 6" fill="none"/>
-                                <path d="M 4 6 Q 8 7 10 4" fill="none"/>
+                                    {/* Middle ring */}
+                                    {/* Endpoints at radius 6 from center (10,10). */}
+                                    {/* Control points offset 3 units inward from the midpoint between adjacent radial endpoints. */}
+                                    {/* Six arcs, one per radial segment. */}
+                                    <path d="M 10 4 Q 12 7 16 6" fill="none"/>
+                                    <path d="M 16 6 Q 13 10 16 14" fill="none"/>
+                                    <path d="M 16 14 Q 12 13 10 16" fill="none"/>
+                                    <path d="M 10 16 Q 8 13 4 14" fill="none"/>
+                                    <path d="M 4 14 Q 7 10 4 6" fill="none"/>
+                                    <path d="M 4 6 Q 8 7 10 4" fill="none"/>
 
-                                {/* Outer ring */}
-                                {/* Endpoints at radius 9 from center (10,10). ViewBox 0-20, radius 9 places endpoints near icon edges. */}
-                                {/* Control points offset 5 units inward from the midpoint between adjacent radial endpoints. */}
-                                {/* Six arcs, one per radial segment. */}
-                                <path d="M 10 1 Q 13 4 19 5" fill="none"/>
-                                <path d="M 19 5 Q 16 10 19 15" fill="none"/>
-                                <path d="M 19 15 Q 13 16 10 19" fill="none"/>
-                                <path d="M 10 19 Q 7 16 1 15" fill="none"/>
-                                <path d="M 1 15 Q 4 10 1 5" fill="none"/>
-                                <path d="M 1 5 Q 7 4 10 1" fill="none"/>
+                                    {/* Outer ring */}
+                                    {/* Endpoints at radius 9 from center (10,10). ViewBox 0-20, radius 9 places endpoints near icon edges. */}
+                                    {/* Control points offset 5 units inward from the midpoint between adjacent radial endpoints. */}
+                                    {/* Six arcs, one per radial segment. */}
+                                    <path d="M 10 1 Q 13 4 19 5" fill="none"/>
+                                    <path d="M 19 5 Q 16 10 19 15" fill="none"/>
+                                    <path d="M 19 15 Q 13 16 10 19" fill="none"/>
+                                    <path d="M 10 19 Q 7 16 1 15" fill="none"/>
+                                    <path d="M 1 15 Q 4 10 1 5" fill="none"/>
+                                    <path d="M 1 5 Q 7 4 10 1" fill="none"/>
 
-                                {/* Each arc is a quadratic bezier. Two endpoints on adjacent radial lines. */}
-                                {/* One control point pulled toward center to produce inward curve. */}
-                                {/* Inward pull increases proportionally with ring radius to maintain consistent visual sag. */}
-                            </svg>
+                                    {/* Each arc is a quadratic bezier. Two endpoints on adjacent radial lines. */}
+                                    {/* One control point pulled toward center to produce inward curve. */}
+                                    {/* Inward pull increases proportionally with ring radius to maintain consistent visual sag. */}
+                                </svg>
+                            </div>
+                            <h1>{resources.carbon}</h1>
                         </div>
-                        <h1>{resources.carbon}</h1>
-                    </div>
-                    <div className="resource-field">
-                        <div className="icon">
-                            <svg className="time-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                {/* Circle */}
-                                <circle cx="10" cy="10" r="9" fill="none"/>
+                        <div className="resource-field">
+                            <div className="icon">
+                                <svg className="time-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    {/* Circle */}
+                                    <circle cx="10" cy="10" r="9" fill="none"/>
 
-                                {/* Three FROM center — clockwise */}
-                                <path d="M 10 10 Q 7 6 10 3" fill="none"/>
-                                <path d="M 10 10 Q 19 11 16.8 13.5" fill="none"/>
-                                <path d="M 10 10 Q 4 15 3.2 13.5" fill="none"/>
+                                    {/* Three FROM center — clockwise */}
+                                    <path d="M 10 10 Q 7 6 10 3" fill="none"/>
+                                    <path d="M 10 10 Q 19 11 16.8 13.5" fill="none"/>
+                                    <path d="M 10 10 Q 4 15 3.2 13.5" fill="none"/>
 
-                                {/* Three FROM circumference — counterclockwise */}
-                                <path d="M 10 19 Q 13 16 10 13" fill="none"/>
-                                <path d="M 2.2 5.5 Q 4 9 7.5 8.5" fill="none"/>
-                                <path d="M 17.8 5.5 Q 14 4 12.5 8.5" fill="none"/>
-                            </svg>
+                                    {/* Three FROM circumference — counterclockwise */}
+                                    <path d="M 10 19 Q 13 16 10 13" fill="none"/>
+                                    <path d="M 2.2 5.5 Q 4 9 7.5 8.5" fill="none"/>
+                                    <path d="M 17.8 5.5 Q 14 4 12.5 8.5" fill="none"/>
+                                </svg>
+                            </div>
+                            <Clock startingTime={startingTime}/>
                         </div>
-                        <Clock startingTime={startingTime}/>
                     </div>
                 </div>
             )}
