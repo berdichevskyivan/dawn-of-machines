@@ -74,15 +74,15 @@
     background:
         repeating-linear-gradient(
             to right,
-            rgb(64, 64, 64) 0px,
             rgb(64, 64, 64) 1px,
+            rgb(64, 64, 64) 2px,
             transparent 1px,
             transparent 33%
         ),
         repeating-linear-gradient(
             to bottom,
-            rgb(64, 64, 64) 0px,
             rgb(64, 64, 64) 1px,
+            rgb(64, 64, 64) 2px,
             transparent 1px,
             transparent 33%
         );

@@ -157,6 +157,12 @@ function GameRoom({socket}){
             setResources(data.playerData.resources);
         })
 
+        socket.on('game-disconnect', () => {
+            setTimeout(()=>{
+                navigate('/');
+            }, 1000)
+        })
+
         // If we have fresh game data from navigation, use it
         if (startingGameData) {
             setBoard(startingGameData.board);
@@ -169,6 +175,7 @@ function GameRoom({socket}){
         return () => {
             socket.off('starting-game-data');
             socket.off('player-update');
+            socket.off('game-disconnect');
         }
     }, []);
 

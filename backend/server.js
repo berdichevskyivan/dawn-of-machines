@@ -65,6 +65,16 @@ const drainElectricity = (gameId) => {
             // just existing drains a percentage, start with this
             console.log('draining electricity from player ', player.name);
             player.resources.electricity -= 0.1;
+
+            // if player started the game and electricity equals zero, halt everything, disconnect the game
+            if(player.startedGame && player.resources.electricity <= 0){
+                const playerSocket = sockets.find(s => s.socketId === player.socketId);
+                if (playerSocket){
+                    playerSocket.socket.emit('game-disconnect');
+                    gameDisconnect(playerSocket.socket);
+                } 
+            }
+
             // check in the array of actions for actions belonging to THIS player
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
@@ -72,6 +82,17 @@ const drainElectricity = (gameId) => {
             if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
         })
     }
+}
+
+const gameDisconnect = (socket) => {
+    const game = games.find(g => g.startingSocketId === socket.id);
+
+    if(game){
+        intervals = intervals.filter(i => i.gameId !== game.id);
+    }
+
+    // Delete games this socket started
+    games = games.filter(g => g.startingSocketId !== socket.id);
 }
 
 io.on('connection', (socket) => {
