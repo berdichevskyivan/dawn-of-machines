@@ -10,7 +10,7 @@
 .top-ui-bar {
     width: 100%;
     display: flex;
-    justify-content: center;
+    justify-content: space-evenly;
     align-items: center;
     padding-top: 2rem;
     padding-bottom: 1rem;
@@ -20,7 +20,7 @@
     z-index: 1;
 }
 
-.resources-section {
+.resources-section, .buttons-section {
     display: flex;
     flex-flow: row;
     justify-content: center;

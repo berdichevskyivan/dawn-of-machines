@@ -60,16 +60,18 @@ const calculatePosition = (x, z, boardWidth = 10) => {
 const drainElectricity = (gameId) => {
     const game = games.find(g => g.id === gameId);
 
-    game.players.forEach(player => {
-        // just existing drains a percentage, start with this
-        console.log('draining electricity from player ', player.name);
-        player.resources.electricity -= 0.1;
-        // check in the array of actions for actions belonging to THIS player
+    if(game){
+        game.players.forEach(player => {
+            // just existing drains a percentage, start with this
+            console.log('draining electricity from player ', player.name);
+            player.resources.electricity -= 0.1;
+            // check in the array of actions for actions belonging to THIS player
 
-        // then, for each player, we use their socket to emit, ONLY to THEIR socket
-        const playerSocket = sockets.find(s => s.socketId === player.socketId);
-        if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
-    })
+            // then, for each player, we use their socket to emit, ONLY to THEIR socket
+            const playerSocket = sockets.find(s => s.socketId === player.socketId);
+            if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
+        })
+    }
 }
 
 io.on('connection', (socket) => {
@@ -133,6 +135,7 @@ io.on('connection', (socket) => {
                 {
                     name: 'Player 1',
                     socketId: socket.id,
+                    startedGame: true,
                     resources: {
                         iron: 10,
                         carbon: 0,
@@ -237,12 +240,20 @@ io.on('connection', (socket) => {
             // Update player socket
             player.socketId = socket.id
 
+            // if this player was the one who started the game
+            if(player.startedGame){
+                game.startingSocketId = socket.id; // we ALSO update the startingSocketId
+            }
+
             // Also update socket id in sockets array
             // I see. The socket id immediately disconnects so we need to remove it from 
             // the sockets array more slowly
             const socketToUpdate = sockets.find(s => s.socketId === originalSocketId);
-            socketToUpdate.socketId = socket.id; // the new id
-            socketToUpdate.socket = socket; // the new socket itself
+
+            if(socketToUpdate){
+                socketToUpdate.socketId = socket.id; // the new id
+                socketToUpdate.socket = socket; // the new socket itself
+            }
             
             // Update units owned by old socket
             game.units.forEach(u => {
@@ -261,6 +272,25 @@ io.on('connection', (socket) => {
             socket.join(gameRoom)
             socket.emit('starting-game-data', game)
         }
+    })
+
+    socket.on('player-disconnect', () => {
+        if(sockets.find(s => s.socketId === socket.id)){
+            // Grace time: 2s
+            setTimeout(()=>{
+                sockets = sockets.filter(s => s.socketId !== socket.id);
+            }, 2000)
+        }
+
+        const game = games.find(g => g.startingSocketId === socket.id);
+
+        // also clean the intervals attached to that gameId
+        if(game){
+            intervals = intervals.filter(i => i.gameId !== game.id);
+        }
+
+        // Delete games this socket started
+        games = games.filter(g => g.startingSocketId !== socket.id);
     })
 
 })

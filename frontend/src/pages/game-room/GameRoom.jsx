@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 
@@ -108,6 +108,7 @@ function Clock({ startingTime }) {
 
 function GameRoom({socket}){
     const location = useLocation();
+    const navigate = useNavigate();
     const { startingGameData } = location.state || {};
 
     const [board, setBoard] = useState([]);
@@ -115,6 +116,13 @@ function GameRoom({socket}){
     const [buildings, setBuildings] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
+
+    const playerDisconnect = (socket) => {
+        socket.emit('player-disconnect');
+        setTimeout(()=>{
+            navigate('/');
+        }, 1000)
+    }
 
     useEffect(() => {
         const storedSocketId = localStorage.getItem('dom-player-socket');
@@ -257,6 +265,9 @@ function GameRoom({socket}){
                             <Clock startingTime={startingTime}/>
                         </div>
                     </div>
+                    <div className="buttons-section">
+                        <button className="disconnect-button" onClick={()=>{playerDisconnect(socket)}}>Disconnect</button>
+                    </div>
                 </div>
             )}
 
@@ -288,8 +299,6 @@ function GameRoom({socket}){
                 {/* Controls */}
                 <OrbitControls />
             </Canvas>
-
-            <Link to="/"><button className="title-screen-button">Title Screen</button></Link>
         </div>
     );
 }
