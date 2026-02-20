@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls } from '@react-three/drei';
 
 import './GameRoom.css';
 
@@ -22,13 +22,20 @@ import './GameRoom.css';
 //   )
 // }
 
-function Camera(){
-    const { camera } = useThree();
-    useEffect(()=>{
-        camera.position.set(0, 7, 7);
-        camera.lookAt(0, 0, 0);
-    }, []);
-    return null;
+function Camera() {
+  const { camera } = useThree();
+  const controlsRef = useRef();
+
+  useEffect(() => {
+    camera.position.set(0, 7, 7); // x,y,z where the point is the center of the camera
+
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0, -3, 0); // x,y,z where the point is the target
+      controlsRef.current.update();
+    }
+  }, [camera]);
+
+  return <OrbitControls ref={controlsRef} camera={camera} />;
 }
 
 function Tile({position, tile}){
@@ -312,7 +319,7 @@ function GameRoom({socket}){
 
             {/* Board */}
             <Canvas>
-                {/* Camera */}
+                {/* Camera and Controls (OrbitControls)*/}
                 <Camera />
 
                 {/* Lights */}
@@ -335,8 +342,11 @@ function GameRoom({socket}){
                     <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
                 ))}
 
-                {/* Controls */}
-                <OrbitControls />
+                {/* Bottom UI Bar */}
+                {/* This is a div by default */}
+                <Html wrapperClass="bottom-ui-bar">
+
+                </Html>
             </Canvas>
         </div>
     );
