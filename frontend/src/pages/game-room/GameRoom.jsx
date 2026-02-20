@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
+import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import * as THREE from 'three';
 
 import './GameRoom.css';
 
@@ -22,20 +23,62 @@ import './GameRoom.css';
 //   )
 // }
 
-function Camera() {
+function Camera({mainControlsRef}) {
   const { camera } = useThree();
-  const controlsRef = useRef();
 
   useEffect(() => {
     camera.position.set(0, 7, 7); // x,y,z where the point is the center of the camera
 
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, -4, 0); // x,y,z where the point is the target
-      controlsRef.current.update();
+    if (mainControlsRef.current) {
+      mainControlsRef.current.target.set(0, -4, 0); // x,y,z where the point is the target
+      mainControlsRef.current.update();
     }
   }, [camera]);
 
-  return <OrbitControls ref={controlsRef} camera={camera} />;
+  return <OrbitControls ref={mainControlsRef} camera={camera} />;
+}
+
+function ViewportCamera({ targetRef }) {
+  const { camera, size } = useThree();
+  const controlsRef = useRef();
+
+  useEffect(() => {
+    if (!targetRef.current) return;
+
+    // Compute bounds
+    const box = new THREE.Box3().setFromObject(targetRef.current);
+    const sizeVec = new THREE.Vector3();
+    const center = new THREE.Vector3();
+
+    box.getSize(sizeVec);
+    box.getCenter(center);
+
+    // Fit distance based on FOV
+    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
+    const fov = camera.fov * (Math.PI / 180);
+    let distance = maxDim / (2 * Math.tan(fov / 2));
+
+    distance *= 1.4; // padding factor
+
+    camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, distance)));
+    camera.near = distance / 100;
+    camera.far = distance * 100;
+    camera.updateProjectionMatrix();
+
+    if (controlsRef.current) {
+      controlsRef.current.target.copy(center);
+      controlsRef.current.update();
+    }
+  }, []);
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      camera={camera}
+      enablePan
+      enableZoom
+    />
+  );
 }
 
 function Tile({position, tile}){
@@ -130,6 +173,9 @@ function GameRoom({socket}){
     const location = useLocation();
     const navigate = useNavigate();
     const { startingGameData } = location.state || {};
+
+    const mainControlsRef = useRef();
+    const previewRef = useRef();
 
     const [board, setBoard] = useState([]);
     const [units, setUnits] = useState([]);
@@ -320,7 +366,7 @@ function GameRoom({socket}){
             {/* Board */}
             <Canvas>
                 {/* Camera and Controls (OrbitControls)*/}
-                <Camera />
+                <Camera mainControlsRef={mainControlsRef}/>
 
                 {/* Lights */}
                 <ambientLight intensity={Math.PI / 2} />
@@ -352,6 +398,33 @@ function GameRoom({socket}){
                         <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
                         </div>
                         <div className="bottom-ui-panel center-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                            {/* Selection Viewport */}
+                            <div className="selection-container selection-viewport-container">
+                                <div 
+                                    className="selection-viewport"
+                                    onPointerEnter={() => (mainControlsRef.current.enabled = false)}
+                                    onPointerLeave={() => (mainControlsRef.current.enabled = true)}
+                                >
+                                    {/* Viewport R3F/Three Canvas */}
+                                    <Canvas>
+                                        <ViewportCamera targetRef={previewRef} />
+
+                                        {/* lights */}
+                                        <ambientLight intensity={1} />
+                                        <directionalLight position={[5, 5, 5]} />
+
+                                        {/* unit preview mesh */}
+                                        <mesh ref={previewRef} rotation={[0, Math.PI / 4, 0]}>
+                                            <coneGeometry args={[0.4, 0.8, 4]} />
+                                            <meshStandardMaterial color="gold" />
+                                        </mesh>
+                                    </Canvas>
+                                </div>
+                            </div>
+                            {/* Selection Data */}
+                            <div className="selection-container selection-data-container">
+
+                            </div>
                         </div>
                         <div className="bottom-ui-panel right-panel" onContextMenu={(e) => { e.stopPropagation() }}>
                         </div>

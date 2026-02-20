@@ -60,6 +60,26 @@
 
 .center-panel {
     width: 50%;
+    display: flex;
+    flex-flow: row;
+}
+
+.selection-container {
+    height: 100%;
+    width: 50%;
+    border: 1px solid cyan;
+}
+
+.selection-viewport-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.selection-viewport {
+    height: 80%;
+    width: 80%;
+    border: 2px solid rgb(0, 255, 0);
 }
 
 .resources-section, .buttons-section {
