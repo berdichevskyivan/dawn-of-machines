@@ -205,7 +205,7 @@ io.on('connection', (socket) => {
                     x: 0,
                     z: 0,
                     position: null,
-                    speed: 2, // tiles per second
+                    speed: 3, // tiles per second
                 }
             ],
             buildings: [

@@ -134,6 +134,14 @@ function Tile({position, tile, moveToTile}){
 function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
 
+    useFrame((state, delta) => {
+        if(!unitRef.current) return;
+        
+        const smoothTime = 0.1; // seconds to smooth movement
+        unitRef.current.position.x += (position[0] - unitRef.current.position.x) * (delta / smoothTime);
+        unitRef.current.position.z += (position[2] - unitRef.current.position.z) * (delta / smoothTime);
+    });
+
     return (
         <mesh 
             ref={unitRef}
