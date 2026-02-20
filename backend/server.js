@@ -63,7 +63,6 @@ const drainElectricity = (gameId) => {
     if(game){
         game.players.forEach(player => {
             // just existing drains a percentage, start with this
-            console.log('draining electricity from player ', player.name);
             player.resources.electricity -= 0.01; // rate for dev :) 
 
             // if player started the game and electricity equals zero, halt everything, disconnect the game
@@ -81,6 +80,32 @@ const drainElectricity = (gameId) => {
             const playerSocket = sockets.find(s => s.socketId === player.socketId);
             if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
         })
+    }
+}
+
+const resolveActions = (gameId) => {
+    const game = games.find(g => g.id === gameId);
+
+    if(game){
+        // now iterate over the actions
+        game.actions.forEach(action => {
+            switch(action.type){
+                case 'movement':
+                    const unit = game.units.find(u => u.id === action.unitId);
+                    if(!unit) break;
+
+                    const progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                    unit.x = action.startX + (action.destinationX - action.startX) * progress;
+                    unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                    unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+
+                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
+                    break;
+            }
+        });
+
+        game.actions = game.actions.filter(action => Date.now() - action.startingTime < action.duration);
     }
 }
 
@@ -145,7 +170,7 @@ io.on('connection', (socket) => {
         // when selecting units, logic is: if you own those units, you CAN select them, if not , you can't . 
         // this will allow local and global units and buildings to coexist coherently
 
-        const game = {
+        let game = {
             id: randomUUID(),
             title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
             room: gameRoomName,
@@ -176,6 +201,7 @@ io.on('connection', (socket) => {
                     x: 0,
                     z: 0,
                     position: null,
+                    speed: 2, // tiles per second
                 }
             ],
             buildings: [
@@ -233,6 +259,12 @@ io.on('connection', (socket) => {
 
         const mainInterval = setInterval(()=>{
             drainElectricity(game.id);
+
+            // resolveActions while filtering the resolvedOnes (by duration)
+            resolveActions(game.id);
+            if(game.actions.length > 0){
+                console.log('actions in the actions array: ', game.actions);
+            }
         }, 50)
 
         intervals.push({gameId: game.id, interval: mainInterval});
@@ -316,6 +348,43 @@ io.on('connection', (socket) => {
         // Delete games this socket started
         games = games.filter(g => g.startingSocketId !== socket.id);
     })
+
+    // A socket requests movement
+    socket.on('movement', (data)=>{
+        console.log(`socket ${socket.id} in room ${data.room} requested movement for unit ${data.unitId} to tile ${data.tileId}`);
+
+        const game = games.find(g => g.room === data.room);
+
+        if(game){
+            const unit = game.units.find(u => u.id === data.unitId);
+
+            if(unit){
+                // if unit is already moving, remove any type: 'movement' actions from array
+                game.actions = game.actions.filter(action => !(action.type === 'movement' && action.unitId === data.unitId));
+
+                const startTile = boardTemplate.find(t => t.id === unit.position);
+                const endTile = boardTemplate.find(t => t.id === data.tileId);
+
+                const distance = Math.sqrt(
+                    Math.pow(endTile.x - startTile.x, 2) + 
+                    Math.pow(endTile.z - startTile.z, 2)
+                );
+
+                const duration = (distance / unit.speed) * 1000; // convert to ms
+
+                game.actions.push({
+                    type: 'movement',
+                    unitId: data.unitId,
+                    startingTime: Date.now(),
+                    duration: duration,
+                    startX: startTile.x,
+                    startZ: startTile.z,
+                    destinationX: endTile.x,
+                    destinationZ: endTile.z,
+                })
+            }
+        }
+    });
 
 })
 

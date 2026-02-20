@@ -82,6 +82,10 @@
     border: 2px solid rgb(0, 255, 0);
 }
 
+.selected-text {
+    text-align: center;
+}
+
 .resources-section, .buttons-section {
     display: flex;
     flex-flow: row;

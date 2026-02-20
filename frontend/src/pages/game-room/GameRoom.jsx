@@ -65,12 +65,17 @@ function ViewportCamera({ targetRef, selected }) {
     box.getSize(sizeVec);
     box.getCenter(center);
 
+    if(selected.model !== 'gather-node'){
+        // nudge the center slightly
+        center.y += sizeVec.y * -0.10;
+    }
+
     // Fit distance based on FOV
     const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
     const fov = camera.fov * (Math.PI / 180);
     let distance = maxDim / (2 * Math.tan(fov / 2));
 
-    distance *= 1.4; // padding factor
+    distance *= 1.8; // padding factor
 
     camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, distance)));
     camera.near = distance / 100;
@@ -93,7 +98,7 @@ function ViewportCamera({ targetRef, selected }) {
   );
 }
 
-function Tile({position, tile}){
+function Tile({position, tile, moveToTile}){
 
     const tileRef = useRef();
 
@@ -111,12 +116,13 @@ function Tile({position, tile}){
             </mesh>
 
             {/* Tile */}
+            {/* On context menu, if unit, we trigger movement */}
             <mesh 
                 ref={tileRef}
                 renderOrder={1}
                 scale={[0.50, 0.50, 1]}
                 onClick={(event) => { console.log('tile.id: ', tile.id) }}
-                onContextMenu={(event) => {console.log('tile.id on right click: ', tile.id)}}
+                onContextMenu={(event) => { moveToTile(tile.id) }}
             >
                 <planeGeometry args={[1.9,1.9]} />
                 <meshStandardMaterial color="green" />
@@ -194,6 +200,7 @@ function GameRoom({socket}){
     const [buildings, setBuildings] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
+    const [gameRoom, setGameRoom] = useState('');
     const [selected, setSelected] = useState(null);
 
     const selectUnit = (unitId) => {
@@ -211,6 +218,28 @@ function GameRoom({socket}){
             console.log('building: ', building)
             setSelected(building);
         }
+    }
+
+    const moveToTile = (tileId) => {
+        // If nothing is selected, no movement can be done
+        if(!selected){
+            console.log('Nothing is selected!');
+            return;
+        }
+
+        // right now, we just move, but later
+        // we will differentiate between moving units and non-moving buildings
+        // TODO: units and buildings seem to be flowing to UNIFICATION, type: unit and type: building but what could be the name of the objects.
+        // Entities? Perhaps. It's possible.
+
+        // Ok. Here we emit. We NEED to know:
+        // The Tile the player wants to go to
+        // WHICH unit wants to go to that tile
+        // the game can be looked up by the server
+        socket.emit('movement', { tileId, unitId: selected.id, room: gameRoom })
+
+        // We dont do anything else here. We just need to bind the "receiving signal" to a signal.on and we're good
+        console.log('moveToTile: ', tileId);
     }
 
     const playerDisconnect = (socket) => {
@@ -246,12 +275,20 @@ function GameRoom({socket}){
             setBuildings(data.buildings.filter(b => b.player === socket.id));
             setResources(data.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(data.startingTime);
+            setGameRoom(data.room);
         })
 
         // Handles player-update
         socket.on('player-update', (data) => {
             setResources(data.playerData.resources);
         })
+
+        // Handles movement
+        socket.on('movement-update', (data) => {
+            setUnits(prev => prev.map(u => 
+                u.id === data.unitId ? { ...u, x: data.x, z: data.z } : u
+            ));
+        });
 
         socket.on('game-disconnect', () => {
             setTimeout(()=>{
@@ -266,6 +303,7 @@ function GameRoom({socket}){
             setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
             setResources(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(startingGameData.startingTime);
+            setGameRoom(startingGameData.room);
         }
 
         return () => {
@@ -386,7 +424,7 @@ function GameRoom({socket}){
 
                 {/* Tiles */}
                 { board.length > 0 && board.map((tile, index) => (
-                    <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile}/>
+                    <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile} moveToTile={moveToTile} />
                 ))}
 
                 {/* Units */}
@@ -434,7 +472,11 @@ function GameRoom({socket}){
                             </div>
                             {/* Selection Data */}
                             <div className="selection-container selection-data-container">
-
+                                { selected && (
+                                    <>
+                                        <h1 className="selected-text">{ selected.name }</h1>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <div className="bottom-ui-panel right-panel" onContextMenu={(e) => { e.stopPropagation() }}>
