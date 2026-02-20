@@ -67,6 +67,9 @@ const drainElectricity = (gameId) => {
 
             // if player started the game and electricity equals zero, halt everything, disconnect the game
             if(player.startedGame && player.resources.electricity <= 0){
+                // immediately delete all actions
+                game.actions = []
+
                 const playerSocket = sockets.find(s => s.socketId === player.socketId);
                 if (playerSocket){
                     playerSocket.socket.emit('game-disconnect');
@@ -75,6 +78,7 @@ const drainElectricity = (gameId) => {
             }
 
             // check in the array of actions for actions belonging to THIS player
+            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.5;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.find(s => s.socketId === player.socketId);
@@ -105,7 +109,7 @@ const resolveActions = (gameId) => {
             }
         });
 
-        game.actions = game.actions.filter(action => Date.now() - action.startingTime < action.duration);
+        game.actions = game.actions.filter(action => (Date.now() - action.startingTime) < action.duration);
     }
 }
 
@@ -374,6 +378,7 @@ io.on('connection', (socket) => {
 
                 game.actions.push({
                     type: 'movement',
+                    playerId: unit.player || null,
                     unitId: data.unitId,
                     startingTime: Date.now(),
                     duration: duration,
