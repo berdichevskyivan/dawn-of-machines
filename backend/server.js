@@ -168,7 +168,7 @@ io.on('connection', (socket) => {
             resources: [], // define the resource object and coordinates
             units: [
                 {
-                    id: 0,
+                    id: randomUUID(),
                     name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
                     player: socket.id, // IMPORTANT: if player is null, it means its NOT controlled by ANY player.
                     sight: [],
@@ -179,7 +179,7 @@ io.on('connection', (socket) => {
             ],
             buildings: [
                 {
-                    id: 0,
+                    id: randomUUID(),
                     name: 'Assembly Plant',
                     player: socket.id,
                     sight: [],
@@ -188,7 +188,7 @@ io.on('connection', (socket) => {
                     position: null,
                 },
                 {
-                    id: 1,
+                    id: randomUUID(),
                     name: 'Generator',
                     player: socket.id,
                     sight: [],

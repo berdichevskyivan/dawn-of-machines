@@ -54,6 +54,7 @@ function Tile({position, tile}){
                 renderOrder={1}
                 scale={[0.50, 0.50, 1]}
                 onClick={(event) => { console.log('tile.id: ', tile.id) }}
+                onContextMenu={(event) => {console.log('tile.id on right click: ', tile.id)}}
             >
                 <planeGeometry args={[1.9,1.9]} />
                 <meshStandardMaterial color="green" />
@@ -62,11 +63,17 @@ function Tile({position, tile}){
     )
 }
 
-function Unit({position}){
+function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
 
     return (
-        <mesh ref={unitRef} position={[position[0], 0.5, position[2]]} rotation={[0, 0, 0]} scale={0.5}>
+        <mesh 
+            ref={unitRef}
+            position={[position[0], 0.5, position[2]]}
+            rotation={[0, 0, 0]}
+            scale={0.5}
+            onClick={(event)=>{ selectUnit(unit.id) }} // left click selects the unit
+        >
             {/* arg here is: radius */}
             <sphereGeometry args={[0.5]} />
             <meshStandardMaterial color="yellow" />
@@ -74,11 +81,17 @@ function Unit({position}){
     )
 }
 
-function Building({position}){
+function Building({position, building, selectBuilding}){
     const buildingRef = useRef();
 
     return (
-        <mesh ref={buildingRef} position={[position[0], 0.5, position[2]]} rotation={[0, Math.PI / 4, 0]} scale={1}>
+        <mesh 
+            ref={buildingRef}
+            position={[position[0], 0.5, position[2]]}
+            rotation={[0, Math.PI / 4, 0]}
+            scale={1}
+            onClick={(event)=>{ selectBuilding(building.id) }} // left click selects the building
+        >
             {/* arg here is: base radius, height, number of sides */}
             <coneGeometry args={[0.5, 1, 4]} />
             <meshStandardMaterial color="yellow" />
@@ -116,6 +129,25 @@ function GameRoom({socket}){
     const [buildings, setBuildings] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
+    const [selectedUnit, setSelectedUnit] = useState(null);
+    const [selectedBuilding, setSelectedBuilding] = useState(null);
+
+    const selectUnit = (unitId) => {
+        const unit = units.find(u => u.id === unitId);
+        if(unit){
+            console.log('unit: ', unit)
+            setSelectedUnit(unit);
+        }
+    }
+
+    const selectBuilding = (buildingId) => {
+        const building = buildings.find(b => b.id === buildingId);
+
+        if(building){
+            console.log('building: ', building)
+            setSelectedBuilding(building);
+        }
+    }
 
     const playerDisconnect = (socket) => {
         socket.emit('player-disconnect');
@@ -295,12 +327,12 @@ function GameRoom({socket}){
 
                 {/* Units */}
                 { units.length > 0 && units.map((unit, index) => (
-                    <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} />
+                    <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
                 ))}
 
                 {/* Buildings */}
                 { buildings.length > 0 && buildings.map((building, index) => (
-                    <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} />
+                    <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
                 ))}
 
                 {/* Controls */}
