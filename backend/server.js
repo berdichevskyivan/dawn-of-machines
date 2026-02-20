@@ -64,7 +64,7 @@ const drainElectricity = (gameId) => {
         game.players.forEach(player => {
             // just existing drains a percentage, start with this
             console.log('draining electricity from player ', player.name);
-            player.resources.electricity -= 0.1;
+            player.resources.electricity -= 0.01; // rate for dev :) 
 
             // if player started the game and electricity equals zero, halt everything, disconnect the game
             if(player.startedGame && player.resources.electricity <= 0){

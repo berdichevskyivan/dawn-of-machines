@@ -30,7 +30,7 @@ function Camera() {
     camera.position.set(0, 7, 7); // x,y,z where the point is the center of the camera
 
     if (controlsRef.current) {
-      controlsRef.current.target.set(0, -3, 0); // x,y,z where the point is the target
+      controlsRef.current.target.set(0, -4, 0); // x,y,z where the point is the target
       controlsRef.current.update();
     }
   }, [camera]);
@@ -344,8 +344,18 @@ function GameRoom({socket}){
 
                 {/* Bottom UI Bar */}
                 {/* This is a div by default */}
-                <Html wrapperClass="bottom-ui-bar">
-
+                {/* We add another wrapper div because Html adds another wrapper div */}
+                {/* So we target that first div and then we have control over inner-wrapper */}
+                <Html wrapperClass="bottom-ui-bar" style={{pointerEvents: 'auto'}} >
+                    <div className="inner-wrapper">
+                        {/* stopPropagation prevents the event from reaching the OrbitControls */}
+                        <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                        </div>
+                        <div className="bottom-ui-panel center-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                        </div>
+                        <div className="bottom-ui-panel right-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                        </div>
+                    </div>
                 </Html>
             </Canvas>
         </div>
