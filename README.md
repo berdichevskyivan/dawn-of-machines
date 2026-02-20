@@ -1,6 +1,6 @@
 # Dawn of Machines
 
-A multiplayer RTS engine.
+A multiplayer RTS engine using React, Node, Socket.IO and React Three Fiber.
 
 ## Setup
 
