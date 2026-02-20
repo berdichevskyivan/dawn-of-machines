@@ -170,6 +170,7 @@ io.on('connection', (socket) => {
                 {
                     id: randomUUID(),
                     name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
+                    model: 'gather-node',
                     player: socket.id, // IMPORTANT: if player is null, it means its NOT controlled by ANY player.
                     sight: [],
                     x: 0,
@@ -181,6 +182,7 @@ io.on('connection', (socket) => {
                 {
                     id: randomUUID(),
                     name: 'Assembly Plant',
+                    model: 'assembly-plant',
                     player: socket.id,
                     sight: [],
                     x: 1,
@@ -190,6 +192,7 @@ io.on('connection', (socket) => {
                 {
                     id: randomUUID(),
                     name: 'Generator',
+                    model: 'generator',
                     player: socket.id,
                     sight: [],
                     x: 2,

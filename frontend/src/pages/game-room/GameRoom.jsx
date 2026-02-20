@@ -7,21 +7,33 @@ import * as THREE from 'three';
 import './GameRoom.css';
 
 
-// Keep for example purposes
-// function Plane(props) {
-//   const [hovered, setHover] = useState(false)
-//   const [active, setActive] = useState(false)
-//   useFrame((state, delta) => (meshRef.current.rotation.x += delta))
-//   return (
-//     <mesh
-//       onPointerOver={(event) => setHover(true)}
-//       onPointerOut={(event) => setHover(false)}>
-//       <planeGeometry args={[2, 2]} />
-//       <meshStandardMaterial color={'green'} />
-// meshBasicMaterial: does NOT calculate lighting, meshStandardMaterial: calculates lighting
-//     </mesh>
-//   )
-// }
+function ModelMapper({model, previewRef}){
+    switch(model){
+        case 'gather-node':
+            return (
+                <mesh ref={previewRef}>
+                    <sphereGeometry args={[0.5]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            );
+        case 'assembly-plant':
+            return (
+                <mesh ref={previewRef}>
+                    <coneGeometry args={[0.5, 1, 4]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            );
+        case 'generator':
+            return (
+                <mesh ref={previewRef}>
+                    <coneGeometry args={[0.5, 1, 4]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            )
+        default:
+            return (<></>)
+    }
+}
 
 function Camera({mainControlsRef}) {
   const { camera } = useThree();
@@ -38,7 +50,7 @@ function Camera({mainControlsRef}) {
   return <OrbitControls ref={mainControlsRef} camera={camera} />;
 }
 
-function ViewportCamera({ targetRef }) {
+function ViewportCamera({ targetRef, selected }) {
   const { camera, size } = useThree();
   const controlsRef = useRef();
 
@@ -69,7 +81,7 @@ function ViewportCamera({ targetRef }) {
       controlsRef.current.target.copy(center);
       controlsRef.current.update();
     }
-  }, []);
+  }, [selected]);
 
   return (
     <OrbitControls
@@ -182,14 +194,13 @@ function GameRoom({socket}){
     const [buildings, setBuildings] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
-    const [selectedUnit, setSelectedUnit] = useState(null);
-    const [selectedBuilding, setSelectedBuilding] = useState(null);
+    const [selected, setSelected] = useState(null);
 
     const selectUnit = (unitId) => {
         const unit = units.find(u => u.id === unitId);
         if(unit){
             console.log('unit: ', unit)
-            setSelectedUnit(unit);
+            setSelected(unit);
         }
     }
 
@@ -198,7 +209,7 @@ function GameRoom({socket}){
 
         if(building){
             console.log('building: ', building)
-            setSelectedBuilding(building);
+            setSelected(building);
         }
     }
 
@@ -407,17 +418,17 @@ function GameRoom({socket}){
                                 >
                                     {/* Viewport R3F/Three Canvas */}
                                     <Canvas>
-                                        <ViewportCamera targetRef={previewRef} />
-
-                                        {/* lights */}
-                                        <ambientLight intensity={1} />
-                                        <directionalLight position={[5, 5, 5]} />
-
                                         {/* unit preview mesh */}
-                                        <mesh ref={previewRef} rotation={[0, Math.PI / 4, 0]}>
-                                            <coneGeometry args={[0.4, 0.8, 4]} />
-                                            <meshStandardMaterial color="gold" />
-                                        </mesh>
+                                        { selected && (
+                                            <>
+                                                <ViewportCamera targetRef={previewRef} selected={selected}/>
+
+                                                {/* lights */}
+                                                <ambientLight intensity={1} />
+                                                <directionalLight position={[5, 5, 5]} />
+                                                <ModelMapper previewRef={previewRef} model={selected.model} />
+                                            </>
+                                        )}
                                     </Canvas>
                                 </div>
                             </div>
