@@ -32,7 +32,7 @@ function TitleScreen({socket}) {
   return (
     <>
       <div className="title-screen-container">
-        <h1>Dawn of Machines</h1>
+        <h1 className="title-text">Dawn of Machines</h1>
         <button className="title-screen-button" onClick={startGame}>Start Game</button> 
         <Link to="/games"><button className="title-screen-button">Join Game</button></Link>
       </div>

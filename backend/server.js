@@ -235,7 +235,9 @@ io.on('connection', (socket) => {
                     startedGame: true,
                     resources: {
                         iron: 10,
+                        steel: 0,
                         carbon: 0,
+                        graphene: 0,
                         electricity: 100
                     },
                     sight: [], // this lives at the player level. Player total sight is determined and enforced by the server, not the client.

@@ -9,4 +9,9 @@
 
 .title-screen-button {
   margin-top: 1rem;
+  margin-bottom: .5rem;
+}
+
+.title-text {
+  font-size: 34px;
 }

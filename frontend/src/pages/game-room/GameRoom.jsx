@@ -195,12 +195,11 @@ function MapResource({position, mapResource, selectMapResource}){
     return (
         <mesh 
             ref={mapResourceRef}
-            position={[position[0], 0.5, position[2]]}
+            position={[position[0], 0.4, position[2]]}
             rotation={[0, 0, 0]}
             scale={1}
             onClick={(event)=>{ selectMapResource(mapResource.id) }} // left click selects the mapResource
         >
-            {/* arg here is: base radius, height, number of sides */}
             <boxGeometry args={[0.8, 0.8, 0.8]} />
             <meshStandardMaterial color="yellow" />
         </mesh>
@@ -306,10 +305,10 @@ function GameRoom({socket}){
         const storedRoom = localStorage.getItem('dom-game-room');
 
         // If we have stored credentials, attempt reconnect
-        if (storedSocketId && storedRoom && storedSocketId !== socket.id) {
+        if (storedSocketId && storedRoom) {
                 console.log('Reconnecting with:', storedSocketId, storedRoom);
                 socket.emit('player-reconnect', {
-                    originalSocketId: storedSocketId,
+                    originalSocketId: storedSocketId !== socket.id ? storedSocketId : socket.id,
                     gameRoom: storedRoom,
                 })
         }
@@ -410,6 +409,12 @@ function GameRoom({socket}){
                         </div>
                         <div className="resource-field">
                             <div className="icon">
+                                <div className="steel-icon" />
+                            </div>
+                            <h1>{resources.steel}</h1>
+                        </div>
+                        <div className="resource-field">
+                            <div className="icon">
                                 <svg className="carbon-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <line x1="10" y1="10" x2="10" y2="0"/>
                                     <line x1="10" y1="10" x2="20" y2="5"/>
@@ -459,6 +464,29 @@ function GameRoom({socket}){
                         </div>
                         <div className="resource-field">
                             <div className="icon">
+                                <svg className="graphene-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                    <g transform="scale(1.50) translate(-3, -3)">
+                                        {/* center */}
+                                        <polygon points="11.73,9 11.73,11 10,12 8.27,11 8.27,9 10,8" fill="none"/>
+                                        {/* right */}
+                                        <polygon points="15.2,9 15.2,11 13.46,12 11.73,11 11.73,9 13.46,8" fill="none"/>
+                                        {/* top-right */}
+                                        <polygon points="13.46,6 13.46,8 11.73,9 10,8 10,6 11.73,5" fill="none"/>
+                                        {/* top-left */}
+                                        <polygon points="10,6 10,8 8.27,9 6.54,8 6.54,6 8.27,5" fill="none"/>
+                                        {/* left */}
+                                        <polygon points="8.27,9 8.27,11 6.54,12 4.8,11 4.8,9 6.54,8" fill="none"/>
+                                        {/* bottom-left */}
+                                        <polygon points="10,12 10,14 8.27,15 6.54,14 6.54,12 8.27,11" fill="none"/>
+                                        {/* bottom-right */}
+                                        <polygon points="13.46,12 13.46,14 11.73,15 10,14 10,12 11.73,11" fill="none"/>
+                                    </g>
+                                </svg>
+                            </div>
+                            <h1>{resources.graphene}</h1>
+                        </div>
+                        <div className="resource-field">
+                            <div className="icon">
                                 <svg className="time-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     {/* Circle */}
                                     <circle cx="10" cy="10" r="9" fill="none"/>
@@ -495,25 +523,25 @@ function GameRoom({socket}){
 
                 {/* Tiles */}
                 {/* Tiles must be filtered by discovered, instead of sight */}
-                { board.length > 0 && board.filter(tile => discovered.includes(tile.id)).map((tile, index) => (
+                { board.length > 0 && board.filter(tile => discovered?.includes(tile.id)).map((tile, index) => (
                     <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile} moveToTile={moveToTile} />
                 ))}
 
                 {/* Units */}
                 {/* All Units, must be filtered by sight */}
-                { units.length > 0 && units.filter(unit=>sight.includes(unit.position)).map((unit, index) => (
+                { units.length > 0 && units.filter(unit=>sight?.includes(unit.position)).map((unit, index) => (
                     <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
                 ))}
 
                 {/* Buildings */}
                 {/* All Buildings, must be filtered by sight */}
-                { buildings.length > 0 && buildings.filter(building=>sight.includes(building.position)).map((building, index) => (
+                { buildings.length > 0 && buildings.filter(building=>sight?.includes(building.position)).map((building, index) => (
                     <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
                 ))}
 
                 {/* Map Resources */}
                 {/* All Map Resources, must be filtered by sight */}
-                { mapResources.length > 0 && mapResources.filter(mr => sight.includes(mr.position)).map((mapResource, index) => (
+                { mapResources.length > 0 && mapResources.filter(mr => sight?.includes(mr.position)).map((mapResource, index) => (
                     <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
                 ))}
 

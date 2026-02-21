@@ -106,7 +106,7 @@
     }
 
     .electricity-text {
-        width: 100px;
+        width: 80px;
     }
 }
 
@@ -117,7 +117,7 @@
     margin-right: .25rem;
 }
 
-.electricity-icon, .iron-icon, .carbon-icon {
+.electricity-icon, .iron-icon, .carbon-icon, .steel-icon, .graphene-icon {
     height: 100%;
     width: 100%;
 }
@@ -153,11 +153,36 @@
             transparent 33%
         );
 }
-/* PS2/GameCube era, 128-bit architecture, 50% brightness, the exact midpoint of the gray scale. */
+
+.steel-icon {
+    background:
+        repeating-linear-gradient(
+            to right,
+            rgb(128, 128, 180) 1px,
+            rgb(128, 128, 180) 2px,
+            transparent 1px,
+            transparent 15.66%
+        ),
+        repeating-linear-gradient(
+            to bottom,
+            rgb(128, 128, 180) 1px,
+            rgb(128, 128, 180) 2px,
+            transparent 1px,
+            transparent 15.66%
+        );
+}
+
 .carbon-icon {
     width: 100%;
     height: 100%;
     stroke: rgb(128, 128, 128);
+    stroke-width: 0.8;
+}
+
+.graphene-icon {
+    width: 100%;
+    height: 100%;
+    stroke: rgb(0, 255, 255);
     stroke-width: 0.8;
 }
 
