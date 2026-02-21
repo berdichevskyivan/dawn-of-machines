@@ -99,7 +99,7 @@ function ViewportCamera({ targetRef, selected }) {
     const fov = camera.fov * (Math.PI / 180);
     let distance = maxDim / (2 * Math.tan(fov / 2));
 
-    distance *= 1.8; // padding factor
+    distance *= 3; // padding factor
 
     camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, distance)));
     camera.near = distance / 100;
@@ -577,7 +577,7 @@ function GameRoom({socket}){
                         {/* stopPropagation prevents the event from reaching the OrbitControls */}
                         <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
                             <div className="actions-container">
-                                { selected && selected.actions.length > 0 && (
+                                { selected && selected.actions && selected.actions.length > 0 && (
                                     <>
                                         { selected.actions.map(action => (
                                             <div className="action-container" onClick={(e) => {startAction(action.type)}}>
