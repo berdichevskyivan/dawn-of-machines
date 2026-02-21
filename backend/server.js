@@ -194,7 +194,26 @@ io.on('connection', (socket) => {
                 }
             ],
             board: [...boardTemplate],
-            resources: [], // define the resource object and coordinates
+            resources: [
+                {
+                    id: randomUUID(),
+                    name: 'Iron Deposit',
+                    model: 'iron-deposit',
+                    x: 6,
+                    z: 7,
+                    position: null,
+                    yield: 100,
+                },
+                {
+                    id: randomUUID(),
+                    name: 'Carbon Deposit',
+                    model: 'carbon-deposit',
+                    x: 8,
+                    z: 9,
+                    position: null,
+                    yield: 100,
+                }
+            ], // define the resource object and coordinates
             units: [
                 {
                     id: randomUUID(),
@@ -206,6 +225,8 @@ io.on('connection', (socket) => {
                     z: 0,
                     position: null,
                     speed: 3, // tiles per second
+                    integrity: 100, // essentially, the HP of machines
+                    material: 'iron', // material the structure of the machine is built off. Other option is: steel. An upgrade. Structure resists MORE.
                 }
             ],
             buildings: [
@@ -218,6 +239,8 @@ io.on('connection', (socket) => {
                     x: 1,
                     z: 1,
                     position: null,
+                    integrity: 100,
+                    material: 'iron',
                 },
                 {
                     id: randomUUID(),
@@ -228,6 +251,8 @@ io.on('connection', (socket) => {
                     x: 2,
                     z: 2,
                     position: null,
+                    integrity: 100,
+                    material: 'iron',
                 }
             ],
         };

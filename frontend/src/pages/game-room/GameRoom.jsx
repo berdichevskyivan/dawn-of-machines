@@ -30,6 +30,20 @@ function ModelMapper({model, previewRef}){
                     <meshStandardMaterial color="yellow" />
                 </mesh>
             )
+        case 'iron-deposit':
+            return (
+                <mesh ref={previewRef}>
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            )
+        case 'carbon-deposit':
+            return (
+                <mesh ref={previewRef}>
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            )
         default:
             return (<></>)
     }
@@ -65,7 +79,7 @@ function ViewportCamera({ targetRef, selected }) {
     box.getSize(sizeVec);
     box.getCenter(center);
 
-    if(selected.model !== 'gather-node'){
+    if(selected.model !== 'gather-node' && selected.model !== 'iron-deposit' && selected.model !== 'carbon-deposit'){
         // nudge the center slightly
         center.y += sizeVec.y * -0.10;
     }
@@ -175,6 +189,24 @@ function Building({position, building, selectBuilding}){
     )
 }
 
+function MapResource({position, mapResource, selectMapResource}){
+    const mapResourceRef = useRef();
+
+    return (
+        <mesh 
+            ref={mapResourceRef}
+            position={[position[0], 0.5, position[2]]}
+            rotation={[0, 0, 0]}
+            scale={1}
+            onClick={(event)=>{ selectMapResource(mapResource.id) }} // left click selects the mapResource
+        >
+            {/* arg here is: base radius, height, number of sides */}
+            <boxGeometry args={[0.8, 0.8, 0.8]} />
+            <meshStandardMaterial color="yellow" />
+        </mesh>
+    )
+}
+
 function Clock({ startingTime }) {
     const [elapsed, setElapsed] = useState(Date.now() - startingTime);
 
@@ -206,6 +238,7 @@ function GameRoom({socket}){
     const [board, setBoard] = useState([]);
     const [units, setUnits] = useState([]);
     const [buildings, setBuildings] = useState([]);
+    const [mapResources, setMapResources] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
     const [gameRoom, setGameRoom] = useState('');
@@ -225,6 +258,15 @@ function GameRoom({socket}){
         if(building){
             console.log('building: ', building)
             setSelected(building);
+        }
+    }
+
+    const selectMapResource = (mapResourceId) => {
+        const mapResource = mapResources.find(b => b.id === mapResourceId);
+
+        if(mapResource){
+            console.log('mapResource: ', mapResource)
+            setSelected(mapResource);
         }
     }
 
@@ -284,6 +326,7 @@ function GameRoom({socket}){
             setResources(data.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(data.startingTime);
             setGameRoom(data.room);
+            setMapResources(data.resources);
         })
 
         // Handles player-update
@@ -312,6 +355,7 @@ function GameRoom({socket}){
             setResources(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(startingGameData.startingTime);
             setGameRoom(startingGameData.room);
+            setMapResources(startingGameData.resources);
         }
 
         return () => {
@@ -445,6 +489,11 @@ function GameRoom({socket}){
                     <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
                 ))}
 
+                {/* Map Resources */}
+                { mapResources.length > 0 && mapResources.map((mapResource, index) => (
+                    <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
+                ))}
+
                 {/* Bottom UI Bar */}
                 {/* This is a div by default */}
                 {/* We add another wrapper div because Html adds another wrapper div */}
@@ -483,6 +532,17 @@ function GameRoom({socket}){
                                 { selected && (
                                     <>
                                         <h1 className="selected-text">{ selected.name }</h1>
+                                        {selected.integrity && selected.material && (
+                                            <>
+                                                <h2 className="selected-text">Integrity: { selected.integrity }</h2>
+                                                <h2 className="selected-text">Material: { selected.material[0].toUpperCase() + selected.material.slice(1) }</h2>
+                                            </>
+                                        )}
+                                        {selected.yield && (
+                                            <>
+                                                <h2 className="selected-text">Yield: { selected.yield }</h2>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </div>
