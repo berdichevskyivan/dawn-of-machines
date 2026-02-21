@@ -160,8 +160,16 @@ const resolveActions = (gameId) => {
                         // recalculate sight and assign
                         unit.sight = calculateSight(Math.round(unit.x), Math.round(unit.z))
 
-                        // now we push back into player.sight
-                        player.sight = [...player.sight, ...unit.sight];
+                        // recompute total player sight from ALL entities
+                        const allPlayerUnits = game.units.filter(u => u.player === player.socketId);
+                        const allPlayerBuildings = game.buildings.filter(b => b.player === player.socketId);
+
+                        player.sight = [
+                            ...new Set([
+                                ...allPlayerUnits.flatMap(u => u.sight),
+                                ...allPlayerBuildings.flatMap(b => b.sight),
+                            ])
+                        ];
 
                         // adds to player.discovered and deduplicates by using a Set
                         player.discovered = [
