@@ -106,7 +106,21 @@ const resolveActions = (gameId) => {
 
                     unit.x = action.startX + (action.destinationX - action.startX) * progress;
                     unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                    // Previous position can be accessed HERE
+                    const previousPosition = unit.position;
+                    // Movement happens HERE
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+
+                    // Only then we update. if there was a change
+                    if(previousPosition !== unit.position){
+                        // We get the tile for the previous position
+                        const previousPositionTile = game.board.find(tile => tile.id === previousPosition);
+                        // Set to null, unit is NOT there anymore
+                        previousPositionTile.unit = null;
+                        // Now we get the new tile the unit is on
+                        const newPositionTile = game.board.find(tile => tile.id === unit.position);
+                        newPositionTile.unit = unit.id;
+                    }
 
                     const player = game.players.find(p => p.socketId === unit.player);
 
