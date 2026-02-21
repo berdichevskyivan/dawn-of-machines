@@ -95,6 +95,10 @@ const resolveActions = (gameId) => {
         game.actions.forEach(action => {
             switch(action.type){
                 case 'movement':
+                    // HERE is where we do the recalculations derived from movement
+                    // We need to recalculate the sight of the unit
+                    // We need to recalculate the sight of the player
+                    // We need to recalculate unit, building or resource from the specific tile of the specific board, and update it to null if dissocupied
                     const unit = game.units.find(u => u.id === action.unitId);
                     if(!unit) break;
 
@@ -103,6 +107,35 @@ const resolveActions = (gameId) => {
                     unit.x = action.startX + (action.destinationX - action.startX) * progress;
                     unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+
+                    const player = game.players.find(p => p.socketId === unit.player);
+
+                    if(player){
+                        // we remove the previous sight of this unit from the player's sight array
+                        // We riding that O(n)
+                        for (const tileId of unit.sight) {
+                            const index = player.sight.indexOf(tileId);
+                            if (index !== -1) {
+                                player.sight.splice(index, 1);
+                            }
+                        }
+
+                        // recalculate sight and assign
+                        unit.sight = calculateSight(Math.round(unit.x), Math.round(unit.z))
+
+                        // now we push back into player.sight
+                        player.sight = [...player.sight, ...unit.sight];
+
+                        // adds to player.discovered and deduplicates by using a Set
+                        player.discovered = [
+                            ...new Set([...player.discovered, ...unit.sight])
+                        ];
+
+                        // now we emit ONLY to the socket of the player
+                        const playerSocket = sockets.find(s => s.socketId === player.socketId);
+
+                        if(playerSocket) playerSocket.socket.emit('sight-discovery-update', { sight: player.sight, discovered: player.discovered })
+                    }
 
                     io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
                     break;
@@ -191,6 +224,8 @@ io.on('connection', (socket) => {
                         carbon: 0,
                         electricity: 100
                     },
+                    sight: [], // this lives at the player level. Player total sight is determined and enforced by the server, not the client.
+                    discovered: [], // player may or may not have sight on these tiles, but they are visible already. Still, sight has its own logic (some things depend SOLELY on sight, NOT discovery)
                 }
             ],
             board: [...boardTemplate],
@@ -259,8 +294,15 @@ io.on('connection', (socket) => {
 
         // we calculate the sight and positions of units
         // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
+        // at this point we only have ONE player so we can place total sight here
+        // but later, in join-game event, we do this ONLY for the units and buildings of THAT player, not "all" (which here is just one: the first)
         game.units = game.units.map(u => {
+            const calculatedSight = calculateSight(u.x, u.z);
             const calculatedPosition = calculatePosition(u.x, u.z);
+
+            game.players[0].sight.push(...calculatedSight);
+            // starting point, discovery is same as sight
+            game.players[0].discovered.push(...calculatedSight)
 
             game.board = game.board.map(tile => {
                 if(tile.id === calculatedPosition){
@@ -275,7 +317,7 @@ io.on('connection', (socket) => {
 
             return {
                 ...u,
-                sight: calculateSight(u.x, u.z),
+                sight: calculatedSight,
                 position: calculatedPosition,
             }
         });
@@ -283,7 +325,12 @@ io.on('connection', (socket) => {
         // we calculate the sight and positions of buildings
         // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
         game.buildings = game.buildings.map(b => {
+            const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
+
+            game.players[0].sight.push(...calculatedSight);
+            // starting point, discovery is same as sight
+            game.players[0].discovered.push(...calculatedSight)
 
             game.board = game.board.map(tile => {
                 if(tile.id === calculatedPosition){
@@ -298,7 +345,7 @@ io.on('connection', (socket) => {
 
             return {
                 ...b,
-                sight: calculateSight(b.x, b.z),
+                sight: calculatedSight,
                 position: calculatedPosition,
             }
         });

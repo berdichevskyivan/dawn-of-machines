@@ -242,6 +242,8 @@ function GameRoom({socket}){
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
     const [gameRoom, setGameRoom] = useState('');
+    const [sight, setSight] = useState([]);
+    const [discovered, setDiscovered] = useState([]);
     const [selected, setSelected] = useState(null);
 
     const selectUnit = (unitId) => {
@@ -327,6 +329,8 @@ function GameRoom({socket}){
             setStartingTime(data.startingTime);
             setGameRoom(data.room);
             setMapResources(data.resources);
+            setSight(data.players.filter(p => p.socketId === socket.id)[0]?.sight);
+            setDiscovered(data.players.filter(p => p.socketId === socket.id)[0]?.discovered);
         })
 
         // Handles player-update
@@ -343,6 +347,11 @@ function GameRoom({socket}){
 
         socket.on('movement-forbidden', (data) => {
             console.log('movement-forbidden: ', data.msg);
+        });
+
+        socket.on('sight-discovery-update', (data)=>{
+            setSight(data.sight);
+            setDiscovered(data.discovered);
         })
 
         socket.on('game-disconnect', () => {
@@ -351,7 +360,8 @@ function GameRoom({socket}){
             }, 1000)
         })
 
-        // If we have fresh game data from navigation, use it
+        // TODO: The filtering MUST be done by the backend
+        // The frontend ONLY receives THAT player's data. Not others.
         if (startingGameData) {
             setBoard(startingGameData.board);
             setUnits(startingGameData.units.filter(u => u.player === socket.id));
@@ -360,6 +370,8 @@ function GameRoom({socket}){
             setStartingTime(startingGameData.startingTime);
             setGameRoom(startingGameData.room);
             setMapResources(startingGameData.resources);
+            setSight(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.sight);
+            setDiscovered(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.discovered);
         }
 
         return () => {
@@ -368,6 +380,7 @@ function GameRoom({socket}){
             socket.off('game-disconnect');
             socket.off('movement-update');
             socket.off('movement-forbidden');
+            socket.off('sight-discovery-update');
         }
     }, []);
 
@@ -481,22 +494,26 @@ function GameRoom({socket}){
                 <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
 
                 {/* Tiles */}
-                { board.length > 0 && board.map((tile, index) => (
+                {/* This works surprisingly well */}
+                { board.length > 0 && board.filter(tile => sight.includes(tile.id)).map((tile, index) => (
                     <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile} moveToTile={moveToTile} />
                 ))}
 
                 {/* Units */}
-                { units.length > 0 && units.map((unit, index) => (
+                {/* All Unit, must be filtered by sight */}
+                { units.length > 0 && units.filter(unit=>sight.includes(unit.position)).map((unit, index) => (
                     <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
                 ))}
 
                 {/* Buildings */}
-                { buildings.length > 0 && buildings.map((building, index) => (
+                {/* All Buildings, must be filtered by sight */}
+                { buildings.length > 0 && buildings.filter(building=>sight.includes(building.position)).map((building, index) => (
                     <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
                 ))}
 
                 {/* Map Resources */}
-                { mapResources.length > 0 && mapResources.map((mapResource, index) => (
+                {/* All Map Resources, must be filtered by sight */}
+                { mapResources.length > 0 && mapResources.filter(mr => sight.includes(mr.position)).map((mapResource, index) => (
                     <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
                 ))}
 
