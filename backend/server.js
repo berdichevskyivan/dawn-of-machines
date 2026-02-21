@@ -23,6 +23,11 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                     building: null,
                                 }))
 
+const actionsMap = {
+    'build-gather-node': { duration: 5000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
+    'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
+}
+
 const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
     const deltas = [
         [0, 0],   // self
@@ -108,6 +113,8 @@ const resolveActions = (gameId) => {
 
     if(game){
         // now iterate over the actions
+        let progress = null;
+        let player = null;
         game.actions.forEach(action => {
             switch(action.type){
                 case 'movement':
@@ -118,7 +125,7 @@ const resolveActions = (gameId) => {
                     const unit = game.units.find(u => u.id === action.unitId);
                     if(!unit) break;
 
-                    const progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
                     unit.x = action.startX + (action.destinationX - action.startX) * progress;
                     unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
@@ -138,7 +145,7 @@ const resolveActions = (gameId) => {
                         newPositionTile.unit = unit.id;
                     }
 
-                    const player = game.players.find(p => p.socketId === unit.player);
+                    player = game.players.find(p => p.socketId === unit.player);
 
                     if(player){
                         // we remove the previous sight of this unit from the player's sight array
@@ -168,6 +175,44 @@ const resolveActions = (gameId) => {
                     }
 
                     io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
+                    break;
+                case 'build-gather-node':
+                    console.log('executing action build-gather-node', action);
+                    // we dont update anything from the building so we dont need the building now
+                    // eventually yes, because we need to spawn the new node from adjacent tiles
+                    const building = game.buildings.find(b => b.id === action.buildingId);
+
+                    if(!building) break;
+
+                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                    player = game.players.find(p => p.socketId === building.player);
+                    const playerSocket = sockets.find(s => s.socketId === player.socketId);
+
+                    // Once we compute the progress, we perform the intended action
+                    if(progress >= 1){
+                        // here we do what we need to do
+                        // for now, add a unit
+                        game.units.push({
+                            id: randomUUID(),
+                            mobile: true,
+                            name: 'Gather Node',
+                            model: 'gather-node',
+                            player: player.socketId,
+                            sight: calculateSight(building.x, building.z+1),
+                            x: building.x,
+                            z: building.z+1,
+                            position: calculatePosition(building.x, building.z+1),
+                            speed: 3,
+                            integrity: 100,
+                            material: 'iron',
+                            actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
+                        })
+
+                        if(playerSocket) playerSocket.socket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
+                    }
+
+                    if(playerSocket) playerSocket.socket.emit('action-progress-update', { actionId: action.id, progress: progress })
+
                     break;
             }
         });
@@ -284,6 +329,7 @@ io.on('connection', (socket) => {
             units: [
                 {
                     id: randomUUID(),
+                    mobile: true,
                     name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
                     model: 'gather-node',
                     player: socket.id, // IMPORTANT: if player is null, it means its NOT controlled by ANY player.
@@ -294,11 +340,13 @@ io.on('connection', (socket) => {
                     speed: 3, // tiles per second
                     integrity: 100, // essentially, the HP of machines
                     material: 'iron', // material the structure of the machine is built off. Other option is: steel. An upgrade. Structure resists MORE.
+                    actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
                 }
             ],
             buildings: [
                 {
                     id: randomUUID(),
+                    mobile: false,
                     name: 'Assembly Plant',
                     model: 'assembly-plant',
                     type: 'assembly-plant',
@@ -309,9 +357,11 @@ io.on('connection', (socket) => {
                     position: null,
                     integrity: 100,
                     material: 'iron',
+                    actions: [{ type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] }],
                 },
                 {
                     id: randomUUID(),
+                    mobile: false,
                     name: 'Generator',
                     model: 'generator',
                     type: 'generator',
@@ -322,6 +372,7 @@ io.on('connection', (socket) => {
                     position: null,
                     integrity: 100,
                     material: 'iron',
+                    actions: [],
                 }
             ],
         };
@@ -540,6 +591,7 @@ io.on('connection', (socket) => {
                 const duration = (distance / unit.speed) * 1000; // convert to ms
 
                 game.actions.push({
+                    id: randomUUID(),
                     type: 'movement',
                     playerId: unit.player || null,
                     unitId: data.unitId,
@@ -553,6 +605,37 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    // A socket receives an action
+    // We want to push into game.actions with minimal input from the user
+    // From the user, we need to know this
+    // - which action.type
+    // - which unit or building is performing this action
+    socket.on('start-action', (data)=>{
+        // we STAMP starting time here. (Date.now())
+        console.log(`socket ${socket.id} in room ${data.room} requested an action for selected id ${data.selected.id}`);
+
+        const game = games.find(g => g.room === data.room);
+        console.log(data);
+        if(game){
+            if(data.selected.mobile === true){
+                const unit = game.units.find(u => u.id === data.selected.id);
+            } else {
+                const building = game.buildings.find(b => b.id === data.selected.id);
+
+                if(building){
+                    game.actions.push({
+                        id: randomUUID(),
+                        type: data.actionType,
+                        buildingId: building.id,
+                        startingTime: Date.now(),
+                        duration: actionsMap[data.actionType].duration, // later you may add modifiers here or in resolveActions
+                    });
+                }
+
+            }
+        }
+    })
 
 })
 

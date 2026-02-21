@@ -6,6 +6,16 @@ import * as THREE from 'three';
 
 import './GameRoom.css';
 
+const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} fill="none" />
+  </svg>
+);
+
+const actionIconsMap = {
+    'build-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'gather': <GatherNodeIcon color="#00FF00" size={50} />,
+}
 
 function ModelMapper({model, previewRef}){
     switch(model){
@@ -301,6 +311,10 @@ function GameRoom({socket}){
         }, 1000)
     }
 
+    const startAction = (actionType) => {
+        socket.emit('start-action', { actionType, room: gameRoom, selected: selected })
+    }
+
     useEffect(() => {
         const storedSocketId = localStorage.getItem('dom-player-socket');
         const storedRoom = localStorage.getItem('dom-game-room');
@@ -352,6 +366,14 @@ function GameRoom({socket}){
         socket.on('sight-discovery-update', (data)=>{
             setSight(data.sight);
             setDiscovered(data.discovered);
+        });
+
+        socket.on('action-progress-update', (data)=>{
+            console.log('action-progress-update', data);
+        });
+
+        socket.on('player-units-update', (data)=>{
+            setUnits(data.units);
         })
 
         socket.on('game-disconnect', () => {
@@ -554,6 +576,22 @@ function GameRoom({socket}){
                     <div className="inner-wrapper">
                         {/* stopPropagation prevents the event from reaching the OrbitControls */}
                         <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                            <div className="actions-container">
+                                { selected && selected.actions.length > 0 && (
+                                    <>
+                                        { selected.actions.map(action => (
+                                            <div className="action-container" onClick={(e) => {startAction(action.type)}}>
+                                                <div className="action-icon">
+                                                    { actionIconsMap[action.type] }
+                                                </div>
+                                                <div className="action-title">
+                                                    <h1>{action.title}</h1>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
                         </div>
                         <div className="bottom-ui-panel center-panel" onContextMenu={(e) => { e.stopPropagation() }}>
                             {/* Selection Viewport */}

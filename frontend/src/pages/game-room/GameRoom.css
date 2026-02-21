@@ -64,10 +64,54 @@
     flex-flow: row;
 }
 
+.actions-container {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-flow: row;
+    padding-top: 1rem;
+    padding-left: 1rem;
+}
+
+.action-container {
+    height: 110px;
+    width: 100px;
+    border: 3px solid rgb(0, 255, 0);
+    margin-right: .5rem;
+    cursor: pointer;
+}
+
+.action-icon {
+    height: 65%;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 3px solid rgb(0, 255, 0);
+}
+
+.action-title {
+    height: 35%;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    h1 {
+        font-size: 12px;
+        margin: 0;
+    }
+}
+
+.map-action-icon {
+    height: 100%;
+    width: 100%;
+}
+
 .selection-container {
     height: 100%;
     width: 50%;
-    border: 1px solid cyan;
 }
 
 .selection-viewport-container {
