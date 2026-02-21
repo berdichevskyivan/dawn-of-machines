@@ -341,6 +341,10 @@ function GameRoom({socket}){
             ));
         });
 
+        socket.on('movement-forbidden', (data) => {
+            console.log('movement-forbidden: ', data.msg);
+        })
+
         socket.on('game-disconnect', () => {
             setTimeout(()=>{
                 navigate('/');
@@ -362,6 +366,8 @@ function GameRoom({socket}){
             socket.off('starting-game-data');
             socket.off('player-update');
             socket.off('game-disconnect');
+            socket.off('movement-update');
+            socket.off('movement-forbidden');
         }
     }, []);
 

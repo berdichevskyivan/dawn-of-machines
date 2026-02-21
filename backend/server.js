@@ -257,25 +257,73 @@ io.on('connection', (socket) => {
             ],
         };
 
-        // here, we add resources, and also run functions and calculations to populate the board, place the players, place the units, etc
-
-        // we calculate the sight of the units
+        // we calculate the sight and positions of units
+        // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
         game.units = game.units.map(u => {
+            const calculatedPosition = calculatePosition(u.x, u.z);
+
+            game.board = game.board.map(tile => {
+                if(tile.id === calculatedPosition){
+                    return {
+                        ...tile,
+                        unit: u.id,
+                    }
+                }
+
+                return {...tile}
+            })
+
             return {
                 ...u,
                 sight: calculateSight(u.x, u.z),
-                position: calculatePosition(u.x, u.z),
+                position: calculatedPosition,
             }
-        })
+        });
 
-        // we calculate the sight of buildings
+        // we calculate the sight and positions of buildings
+        // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
         game.buildings = game.buildings.map(b => {
+            const calculatedPosition = calculatePosition(b.x, b.z);
+
+            game.board = game.board.map(tile => {
+                if(tile.id === calculatedPosition){
+                    return {
+                        ...tile,
+                        building: b.id,
+                    }
+                }
+
+                return {...tile}
+            })
+
             return {
                 ...b,
                 sight: calculateSight(b.x, b.z),
-                position: calculatePosition(b.x, b.z),
+                position: calculatedPosition,
             }
-        })
+        });
+
+        // we calculate the position of resources (not sight)
+        // And assign those tiledIds to the board's tiles
+        game.resources = game.resources.map(r => {
+            const calculatedPosition = calculatePosition(r.x, r.z);
+
+            game.board = game.board.map(tile => {
+                if(tile.id === calculatedPosition){
+                    return {
+                        ...tile,
+                        resource: r.id,
+                    }
+                }
+
+                return {...tile}
+            })
+
+            return {
+                ...r,
+                position: calculatedPosition,
+            }
+        });
 
         // here, we also add the actions that we want starting ALREADY, as we said everything is an action
         // sight: action; movement: action; drain-electricity: action;
@@ -393,6 +441,14 @@ io.on('connection', (socket) => {
 
                 const startTile = boardTemplate.find(t => t.id === unit.position);
                 const endTile = boardTemplate.find(t => t.id === data.tileId);
+
+                const gameBoardEndTile = game.board.find(tile => tile.id === endTile.id);
+
+                // We have the endTile. If the endTile is occupied, we forbid movement.
+                if(gameBoardEndTile && (gameBoardEndTile.resource || gameBoardEndTile.building || gameBoardEndTile.unit)){
+                    socket.emit('movement-forbidden', { msg: 'End tile is occupied' });
+                    return;
+                }
 
                 const distance = Math.sqrt(
                     Math.pow(endTile.x - startTile.x, 2) + 
