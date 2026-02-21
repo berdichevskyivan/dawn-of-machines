@@ -494,13 +494,13 @@ function GameRoom({socket}){
                 <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
 
                 {/* Tiles */}
-                {/* This works surprisingly well */}
-                { board.length > 0 && board.filter(tile => sight.includes(tile.id)).map((tile, index) => (
+                {/* Tiles must be filtered by discovered, instead of sight */}
+                { board.length > 0 && board.filter(tile => discovered.includes(tile.id)).map((tile, index) => (
                     <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile} moveToTile={moveToTile} />
                 ))}
 
                 {/* Units */}
-                {/* All Unit, must be filtered by sight */}
+                {/* All Units, must be filtered by sight */}
                 { units.length > 0 && units.filter(unit=>sight.includes(unit.position)).map((unit, index) => (
                     <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
                 ))}
