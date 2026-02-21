@@ -124,7 +124,11 @@ function Tile({position, tile, moveToTile}){
     return (
         <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
             {/* Outline */}
-            <mesh renderOrder={0}>
+            <mesh 
+                renderOrder={0}
+                onClick={(event) => { console.log('tile.id: ', tile.id) }}
+                onContextMenu={(event) => { moveToTile(tile.id) }}
+            >
                 <planeGeometry args={[1.2, 1.2]} />
                 <meshBasicMaterial color="limegreen" depthWrite={false} />
             </mesh>
@@ -288,9 +292,6 @@ function GameRoom({socket}){
         // WHICH unit wants to go to that tile
         // the game can be looked up by the server
         socket.emit('movement', { tileId, unitId: selected.id, room: gameRoom })
-
-        // We dont do anything else here. We just need to bind the "receiving signal" to a signal.on and we're good
-        console.log('moveToTile: ', tileId);
     }
 
     const playerDisconnect = (socket) => {
@@ -585,13 +586,13 @@ function GameRoom({socket}){
                                         <h1 className="selected-text">{ selected.name }</h1>
                                         {selected.integrity && selected.material && (
                                             <>
-                                                <h2 className="selected-text">Integrity: { selected.integrity }</h2>
-                                                <h2 className="selected-text">Material: { selected.material[0].toUpperCase() + selected.material.slice(1) }</h2>
+                                                <h2 className="selected-text-property">Integrity: { selected.integrity }</h2>
+                                                <h2 className="selected-text-property">Material: { selected.material[0].toUpperCase() + selected.material.slice(1) }</h2>
                                             </>
                                         )}
                                         {selected.yield && (
                                             <>
-                                                <h2 className="selected-text">Yield: { selected.yield }</h2>
+                                                <h2 className="selected-text-property">Yield: { selected.yield }</h2>
                                             </>
                                         )}
                                     </>

@@ -82,8 +82,12 @@
     border: 2px solid rgb(0, 255, 0);
 }
 
-.selected-text {
+.selected-text, .selected-text-property {
     text-align: center;
+}
+
+.selected-text-property {
+    font-size: 18px;
 }
 
 .resources-section, .buttons-section {

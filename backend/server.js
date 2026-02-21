@@ -63,7 +63,7 @@ const drainElectricity = (gameId) => {
     if(game){
         game.players.forEach(player => {
             // just existing drains a percentage, start with this
-            player.resources.electricity -= 0.01; // rate for dev :) 
+            player.resources.electricity -= 0.1; // rate for dev :) 
 
             // if player started the game and electricity equals zero, halt everything, disconnect the game
             if(player.startedGame && player.resources.electricity <= 0){
@@ -79,6 +79,22 @@ const drainElectricity = (gameId) => {
 
             // check in the array of actions for actions belonging to THIS player
             player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.5;
+
+            // then, for each player, we use their socket to emit, ONLY to THEIR socket
+            const playerSocket = sockets.find(s => s.socketId === player.socketId);
+            if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
+        })
+    }
+}
+
+const generateElectricity = (gameId) => {
+    const game = games.find(g => g.id === gameId);
+
+    if(game){
+        game.players.forEach(player => {
+            // check in the array of buildings for generators belonging to this player
+            const playerGenerators = game.buildings.filter(b => b.type === 'generator');
+            player.resources.electricity += playerGenerators.length * 0.15;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.find(s => s.socketId === player.socketId);
@@ -285,6 +301,7 @@ io.on('connection', (socket) => {
                     id: randomUUID(),
                     name: 'Assembly Plant',
                     model: 'assembly-plant',
+                    type: 'assembly-plant',
                     player: socket.id,
                     sight: [],
                     x: 1,
@@ -297,6 +314,7 @@ io.on('connection', (socket) => {
                     id: randomUUID(),
                     name: 'Generator',
                     model: 'generator',
+                    type: 'generator',
                     player: socket.id,
                     sight: [],
                     x: 2,
@@ -399,6 +417,7 @@ io.on('connection', (socket) => {
 
         const mainInterval = setInterval(()=>{
             drainElectricity(game.id);
+            generateElectricity(game.id);
 
             // resolveActions while filtering the resolvedOnes (by duration)
             resolveActions(game.id);
