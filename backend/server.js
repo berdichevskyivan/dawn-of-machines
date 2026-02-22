@@ -24,7 +24,7 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                 }))
 
 const actionsMap = {
-    'build-gather-node': { duration: 10000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
+    'build-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
 
@@ -198,9 +198,7 @@ const resolveActions = (gameId) => {
 
                     // Once we compute the progress, we perform the intended action
                     if(progress >= 1){
-                        // here we do what we need to do
-                        // for now, add a unit
-                        game.units.push({
+                        const gatherNode = {
                             id: randomUUID(),
                             hackId: randomUUID(),
                             mobile: true,
@@ -215,9 +213,14 @@ const resolveActions = (gameId) => {
                             integrity: 100,
                             material: 'iron',
                             actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
-                        })
+                        }
 
-                        if(playerSocket) playerSocket.socket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
+                        game.units.push(gatherNode)
+
+                        if(playerSocket){
+                            playerSocket.socket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
+                            playerSocket.socket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
+                        } 
                     }
 
                     if(playerSocket) playerSocket.socket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })

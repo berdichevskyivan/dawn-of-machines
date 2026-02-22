@@ -60,6 +60,8 @@
 
 .right-panel {
     width: 45%;
+    display: flex;
+    flex-flow: row;
 }
 
 .right-panel-side {
@@ -86,6 +88,16 @@
 
 .communications-main {
     height: 70%;
+}
+
+.communications-main-entry {
+    width: 100%;
+    height: fit-content;
+
+    p {
+        margin: .25rem;
+        padding-left: .5rem;
+    }
 }
 
 .communications-prompt {
@@ -135,8 +147,21 @@
     color: rgb(0, 0, 0);
 }
 
-.right-panel-to-be-defined {
+.right-panel-electricity-graph {
+    .electricity-graph-title {
+        height: 15%;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 12px;
+    }
 
+    .electricity-graph {
+        height: 85%;
+        padding-top: 1rem;
+        width: 100%;
+    }
 }
 
 .center-panel {
@@ -259,6 +284,7 @@
 
     .electricity-text {
         width: 80px;
+        margin-right: .5rem;
     }
 }
 

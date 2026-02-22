@@ -59,6 +59,32 @@ function ModelMapper({model, previewRef}){
     }
 }
 
+const ElectricityGraph = ({ data }) => {
+    const width = 300;
+    const height = 100;
+    const maxTime = data[data.length - 1]?.time || 1;
+    const minTime = data[0]?.time || 0;
+    const timeRange = maxTime - minTime || 1;
+
+    const points = data.map(d => ({
+        x: ((d.time - minTime) / timeRange) * width,
+        y: height - (d.value / 100) * height,
+    }));
+
+    const d = points.reduce((acc, point, i) => {
+        if (i === 0) return `M ${point.x},${point.y}`;
+        const prev = points[i - 1];
+        const cpx = (prev.x + point.x) / 2;
+        return `${acc} C ${cpx},${prev.y} ${cpx},${point.y} ${point.x},${point.y}`;
+    }, '');
+
+    return (
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+            <path d={d} fill="none" stroke="rgb(0,255,0)" strokeWidth={1.5} />
+        </svg>
+    )
+}
+
 function Camera({mainControlsRef}) {
   const { camera } = useThree();
 
@@ -263,6 +289,7 @@ function GameRoom({socket}){
 
     const mainControlsRef = useRef();
     const previewRef = useRef();
+    const startingTimeRef = useRef(null);
 
     const [board, setBoard] = useState([]);
     const [units, setUnits] = useState([]);
@@ -283,6 +310,11 @@ function GameRoom({socket}){
     });
 
     const [commsInput, setCommsInput] = useState('');
+    const [logs, setLogs] = useState([]);
+    const [commands, setCommands] = useState([]);
+    const [signals, setSignals] = useState([]);
+
+    const [graphData, setGraphData] = useState([]);
 
     const selectUnit = (unitId) => {
         const unit = units.find(u => u.id === unitId);
@@ -366,6 +398,7 @@ function GameRoom({socket}){
             setBuildings(data.buildings.filter(b => b.player === socket.id));
             setResources(data.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(data.startingTime);
+            startingTimeRef.current = data.startingTime;
             setGameRoom(data.room);
             setMapResources(data.resources);
             setSight(data.players.filter(p => p.socketId === socket.id)[0]?.sight);
@@ -375,6 +408,10 @@ function GameRoom({socket}){
         // Handles player-update
         socket.on('player-update', (data) => {
             setResources(data.playerData.resources);
+            setGraphData(prev => [...prev, {
+                time: Date.now() - startingTimeRef.current,
+                value: data.playerData.resources.electricity
+            }]);
         })
 
         // Handles movement
@@ -394,7 +431,6 @@ function GameRoom({socket}){
         });
 
         socket.on('action-progress-update', (data) => {
-            console.log(data);
             setCurrentActions(prev => {
                 // remove completed
                 if (data.progress >= 0.995) {
@@ -418,6 +454,18 @@ function GameRoom({socket}){
 
         socket.on('player-units-update', (data)=>{
             setUnits(data.units);
+        });
+
+        socket.on('logs-update', (data)=>{
+            // we timestamp it here
+            const elapsed = Date.now() - startingTimeRef.current;
+            const totalSeconds = Math.floor(elapsed / 1000);
+            const displaySeconds = totalSeconds % 60;
+            const totalMinutes = Math.floor(totalSeconds / 60);
+            const displayMinutes = totalMinutes % 60;
+            const displayHours = Math.floor(totalMinutes / 60);
+
+            setLogs(prev => [...prev, `[${displayHours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}] ${data.log}`]);
         })
 
         socket.on('game-disconnect', () => {
@@ -434,6 +482,7 @@ function GameRoom({socket}){
             setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
             setResources(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.resources);
             setStartingTime(startingGameData.startingTime);
+            startingTimeRef.current = startingGameData.startingTime;
             setGameRoom(startingGameData.room);
             setMapResources(startingGameData.resources);
             setSight(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.sight);
@@ -717,14 +766,23 @@ function GameRoom({socket}){
                                         <h1>Signals</h1>
                                     </div>
                                 </div>
-                                <div className="communications-main"></div>
+                                <div className="communications-main">
+                                    { commsTabs.logs && logs && logs.map(log => (
+                                        <div className="communications-main-entry"><p>{log}</p></div>
+                                    ))}
+                                </div>
                                 <div className="communications-prompt">
                                     <input className="communications-prompt-input" spellCheck={false} value={commsInput} onChange={(e) => { setCommsInput(e.target.value) }} ></input>
                                     <button className="communications-prompt-enter-button">Enter</button>
                                 </div>
                             </div>
-                            <div className="right-panel-to-be-defined right-panel-side">
-
+                            <div className="right-panel-electricity-graph right-panel-side">
+                                <div className="electricity-graph-title">
+                                    <h1>Electricity Graph</h1>
+                                </div>
+                                <div className="electricity-graph">
+                                    <ElectricityGraph data={graphData} />
+                                </div>
                             </div>
                         </div>
                     </div>
