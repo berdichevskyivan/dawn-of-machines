@@ -59,22 +59,93 @@
 }
 
 .right-panel {
+    width: 45%;
+}
+
+.right-panel-side {
+    height: 100%;
     width: 50%;
+    border-right: 1px solid rgb(0, 255, 0);
+}
+
+.right-panel-communications {
+
+}
+
+.communications-tabs, .communications-main, .communications-prompt {
+    width: 100%;
+    border-bottom: 1px solid lime;
+    display: flex;
+    flex-flow: column;
+}
+
+.communications-tabs {
+    height: 15%;
+    flex-flow: row;
+}
+
+.communications-main {
+    height: 70%;
+}
+
+.communications-prompt {
+    height: 15%;
+}
+
+.comms-tab {
+    height: 100%;
+    width: 33.333%;
+    border-right: 1px solid lime;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    h1 {
+        font-size: 14px;
+        margin: 0;
+    }
+}
+
+.right-panel-to-be-defined {
+
 }
 
 .center-panel {
-    width: 25%;
+    width: 30%;
     display: flex;
     flex-flow: row;
 }
 
 .actions-container {
-    height: 100%;
+    height: 65%;
     width: 100%;
     display: flex;
     flex-flow: row;
     padding-top: 1rem;
     padding-left: 1rem;
+}
+
+.actions-progress-container {
+    height: 35%;
+    width: 100%;
+    border-top: 1px solid lime;
+    display: flex;
+    flex-flow: row;
+}
+
+.action-progress {
+    height: 90%;
+    width: 100px;
+    border: 1px solid lime;
+}
+
+.action-percentage {
+    text-align: center;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .action-container {

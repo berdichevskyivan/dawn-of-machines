@@ -24,7 +24,7 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                 }))
 
 const actionsMap = {
-    'build-gather-node': { duration: 5000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
+    'build-gather-node': { duration: 10000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
 
@@ -202,6 +202,7 @@ const resolveActions = (gameId) => {
                         // for now, add a unit
                         game.units.push({
                             id: randomUUID(),
+                            hackId: randomUUID(),
                             mobile: true,
                             name: 'Gather Node',
                             model: 'gather-node',
@@ -219,7 +220,7 @@ const resolveActions = (gameId) => {
                         if(playerSocket) playerSocket.socket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
                     }
 
-                    if(playerSocket) playerSocket.socket.emit('action-progress-update', { actionId: action.id, progress: progress })
+                    if(playerSocket) playerSocket.socket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
 
                     break;
             }
@@ -337,6 +338,7 @@ io.on('connection', (socket) => {
             units: [
                 {
                     id: randomUUID(),
+                    hackId: randomUUID(), // the hackId is NOT the id of the unit. Players cannot know the id. And only if they use specific skills, they can discover the hackId and use it to hack into a unit or building.
                     mobile: true,
                     name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
                     model: 'gather-node',
@@ -354,6 +356,7 @@ io.on('connection', (socket) => {
             buildings: [
                 {
                     id: randomUUID(),
+                    hackId: randomUUID(), // the hackId is NOT the id of the unit. Players cannot know the id. And only if they use specific skills, they can discover the hackId and use it to hack into a unit or building.
                     mobile: false,
                     name: 'Assembly Plant',
                     model: 'assembly-plant',
@@ -369,6 +372,7 @@ io.on('connection', (socket) => {
                 },
                 {
                     id: randomUUID(),
+                    hackId: randomUUID(),
                     mobile: false,
                     name: 'Generator',
                     model: 'generator',
@@ -479,9 +483,9 @@ io.on('connection', (socket) => {
             generateElectricity(game.id);
 
             // resolveActions while filtering the resolvedOnes (by duration)
-            resolveActions(game.id);
             if(game.actions.length > 0){
-                console.log('actions in the actions array: ', game.actions);
+                resolveActions(game.id);
+                console.log('actions in the actions array: ', game.actions.filter(a => a.type === 'build-gather-node'));
             }
         }, 50)
 

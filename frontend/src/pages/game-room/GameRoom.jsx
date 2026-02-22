@@ -159,6 +159,22 @@ function Tile({position, tile, moveToTile}){
     )
 }
 
+function SelectionRing({position}){
+
+    const selectionRingRef = useRef();
+
+    return (
+        <mesh
+            ref={selectionRingRef}
+            position={[position[0], 0.05, position[2]]}
+            rotation={[-Math.PI / 2, 0, 0]}
+        >   
+            <ringGeometry args={[0.6, 0.7, 32]} />
+            <meshBasicMaterial color="yellow" /> 
+        </mesh>
+    )
+}
+
 function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
 
@@ -258,6 +274,8 @@ function GameRoom({socket}){
     const [sight, setSight] = useState([]);
     const [discovered, setDiscovered] = useState([]);
     const [selected, setSelected] = useState(null);
+
+    const [currentActions, setCurrentActions] = useState([]);
 
     const selectUnit = (unitId) => {
         const unit = units.find(u => u.id === unitId);
@@ -368,8 +386,27 @@ function GameRoom({socket}){
             setDiscovered(data.discovered);
         });
 
-        socket.on('action-progress-update', (data)=>{
-            console.log('action-progress-update', data);
+        socket.on('action-progress-update', (data) => {
+            console.log(data);
+            setCurrentActions(prev => {
+                // remove completed
+                if (data.progress >= 0.999) {
+                    return prev.filter(a => a.actionId !== data.actionId);
+                }
+
+                const index = prev.findIndex(a => a.actionId === data.actionId);
+
+                // insert new
+                if (index === -1) {
+                return [...prev, data];
+                }
+
+                // update existing
+                const next = [...prev];
+                next[index] = { ...next[index], progress: data.progress };
+
+                return next;
+            });
         });
 
         socket.on('player-units-update', (data)=>{
@@ -553,19 +590,28 @@ function GameRoom({socket}){
                 {/* Units */}
                 {/* All Units, must be filtered by sight */}
                 { units.length > 0 && units.filter(unit=>sight?.includes(unit.position)).map((unit, index) => (
-                    <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
+                    <>
+                        <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
+                        { selected && selected.id === unit.id && (<SelectionRing position={[unit.x - offsetX, 0, unit.z - offsetZ]} />)}
+                    </>
                 ))}
 
                 {/* Buildings */}
                 {/* All Buildings, must be filtered by sight */}
                 { buildings.length > 0 && buildings.filter(building=>sight?.includes(building.position)).map((building, index) => (
-                    <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
+                    <>
+                        <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
+                        { selected && selected.id === building.id && (<SelectionRing position={[building.x - offsetX, 0, building.z - offsetZ]} />)}
+                    </>
                 ))}
 
                 {/* Map Resources */}
                 {/* All Map Resources, must be filtered by sight */}
                 { mapResources.length > 0 && mapResources.filter(mr => sight?.includes(mr.position)).map((mapResource, index) => (
-                    <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
+                    <>
+                        <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
+                        { selected && selected.id === mapResource.id && (<SelectionRing position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} />)}
+                    </>
                 ))}
 
                 {/* Bottom UI Bar */}
@@ -591,6 +637,16 @@ function GameRoom({socket}){
                                         ))}
                                     </>
                                 )}
+                            </div>
+                            <div className="actions-progress-container">
+                                {currentActions.length > 0 && currentActions.map(action => (
+                                    <div key={action.actionId} className="action-progress">
+                                        <div className="action-icon">
+                                            { actionIconsMap[action.actionType] }
+                                        </div>
+                                        <span className="action-percentage">{Math.round(action.progress * 100)}%</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="bottom-ui-panel center-panel" onContextMenu={(e) => { e.stopPropagation() }}>
@@ -638,6 +694,27 @@ function GameRoom({socket}){
                             </div>
                         </div>
                         <div className="bottom-ui-panel right-panel" onContextMenu={(e) => { e.stopPropagation() }}>
+                            <div className="right-panel-communications right-panel-side">
+                                <div className="communications-tabs">
+                                    {/* Logs */}
+                                    <div className="comms-tab">
+                                        <h1>Logs</h1>
+                                    </div>
+                                    {/* Console: used to issue commands (same name as actions). Eventually allowing to chain commands and "hack"(in-game ability) from console */}
+                                    <div className="comms-tab">
+                                        <h1>Console</h1>
+                                    </div>
+                                    {/* Signals: used to communicate with other players or the board. Example: Distress Signal. Decoy Signal. Request Support Signal. Commands can ALSO use signal names */}
+                                    <div className="comms-tab">
+                                        <h1>Signals</h1>
+                                    </div>
+                                </div>
+                                <div className="communications-main"></div>
+                                <div className="communications-prompt"></div>
+                            </div>
+                            <div className="right-panel-to-be-defined right-panel-side">
+
+                            </div>
                         </div>
                     </div>
                 </Html>
