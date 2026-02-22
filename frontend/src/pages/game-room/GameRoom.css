@@ -90,6 +90,29 @@
 
 .communications-prompt {
     height: 15%;
+    display: flex;
+    flex-flow: row;
+}
+
+.communications-prompt-input {
+    height: 100%;
+    width: 85%;
+    background: rgba(0,0,0,0);
+    color: rgb(0, 255, 0);
+    font-family: "Tomorrow";
+    border: 1px solid rgb(0, 255, 0);
+    padding-left: 1rem;
+}
+
+.communications-prompt-input:focus {
+    outline: none;
+    border-color: rgb(0, 255, 0);
+}
+
+.communications-prompt-enter-button {
+    height: 100%;
+    width: 15%;
+    font-size: 16px;
 }
 
 .comms-tab {
@@ -105,6 +128,11 @@
         font-size: 14px;
         margin: 0;
     }
+}
+
+.comms-tab-selected {
+    background: rgb(0, 255, 0);
+    color: rgb(0, 0, 0);
 }
 
 .right-panel-to-be-defined {

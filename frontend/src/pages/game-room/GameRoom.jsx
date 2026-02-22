@@ -276,6 +276,13 @@ function GameRoom({socket}){
     const [selected, setSelected] = useState(null);
 
     const [currentActions, setCurrentActions] = useState([]);
+    const [commsTabs, setCommsTabs] = useState({
+        logs: true,
+        console: false,
+        signals: false,
+    });
+
+    const [commsInput, setCommsInput] = useState('');
 
     const selectUnit = (unitId) => {
         const unit = units.find(u => u.id === unitId);
@@ -390,7 +397,7 @@ function GameRoom({socket}){
             console.log(data);
             setCurrentActions(prev => {
                 // remove completed
-                if (data.progress >= 0.999) {
+                if (data.progress >= 0.995) {
                     return prev.filter(a => a.actionId !== data.actionId);
                 }
 
@@ -619,7 +626,7 @@ function GameRoom({socket}){
                 {/* We add another wrapper div because Html adds another wrapper div */}
                 {/* So we target that first div and then we have control over inner-wrapper */}
                 <Html wrapperClass="bottom-ui-bar" style={{pointerEvents: 'auto'}} >
-                    <div className="inner-wrapper">
+                    <div className="inner-wrapper" onPointerEnter={() => (mainControlsRef.current.enabled = false)} onPointerLeave={() => (mainControlsRef.current.enabled = true)}>
                         {/* stopPropagation prevents the event from reaching the OrbitControls */}
                         <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
                             <div className="actions-container">
@@ -697,20 +704,24 @@ function GameRoom({socket}){
                             <div className="right-panel-communications right-panel-side">
                                 <div className="communications-tabs">
                                     {/* Logs */}
-                                    <div className="comms-tab">
+                                    <div className={`comms-tab ${ commsTabs.logs === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: true, console: false, signals: false }) } }>
                                         <h1>Logs</h1>
                                     </div>
                                     {/* Console: used to issue commands (same name as actions). Eventually allowing to chain commands and "hack"(in-game ability) from console */}
-                                    <div className="comms-tab">
+                                    <div className={`comms-tab ${ commsTabs.console === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: false, console: true, signals: false }) } }>
                                         <h1>Console</h1>
                                     </div>
                                     {/* Signals: used to communicate with other players or the board. Example: Distress Signal. Decoy Signal. Request Support Signal. Commands can ALSO use signal names */}
-                                    <div className="comms-tab">
+                                    {/* Signals are used in replacement of Chat. Chat is used in the Games page (Lobby) */}
+                                    <div className={`comms-tab ${ commsTabs.signals === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: false, console: false, signals: true }) } }>
                                         <h1>Signals</h1>
                                     </div>
                                 </div>
                                 <div className="communications-main"></div>
-                                <div className="communications-prompt"></div>
+                                <div className="communications-prompt">
+                                    <input className="communications-prompt-input" spellCheck={false} value={commsInput} onChange={(e) => { setCommsInput(e.target.value) }} ></input>
+                                    <button className="communications-prompt-enter-button">Enter</button>
+                                </div>
                             </div>
                             <div className="right-panel-to-be-defined right-panel-side">
 

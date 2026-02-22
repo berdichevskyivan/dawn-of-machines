@@ -485,7 +485,7 @@ io.on('connection', (socket) => {
             // resolveActions while filtering the resolvedOnes (by duration)
             if(game.actions.length > 0){
                 resolveActions(game.id);
-                console.log('actions in the actions array: ', game.actions.filter(a => a.type === 'build-gather-node'));
+                console.log('actions in the actions array: ', game.actions);
             }
         }, 50)
 
