@@ -15,3 +15,11 @@
 .title-text {
   font-size: 34px;
 }
+
+.title-screen-icon-circle {
+  transition: fill 0.5s linear;
+}
+
+.title-screen-icon-triangle {
+  transition: stroke 0.5s linear;
+}

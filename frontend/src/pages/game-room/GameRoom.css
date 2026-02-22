@@ -211,15 +211,15 @@
     background:
         repeating-linear-gradient(
             to right,
-            rgb(128, 128, 180) 1px,
-            rgb(128, 128, 180) 2px,
+            rgb(128, 128, 175) 1px,
+            rgb(128, 128, 175) 2px,
             transparent 1px,
             transparent 15.66%
         ),
         repeating-linear-gradient(
             to bottom,
-            rgb(128, 128, 180) 1px,
-            rgb(128, 128, 180) 2px,
+            rgb(128, 128, 175) 1px,
+            rgb(128, 128, 175) 2px,
             transparent 1px,
             transparent 15.66%
         );
