@@ -14,7 +14,7 @@ const io = new Server(server, {
 let games = new Map();
 let gamesByRoom = new Map();
 let gamesByStarted = new Map();
-let intervals = []; // TODO: Change to map
+let intervals = new Map();
 let sockets = new Map();
 const boardTemplate = Array.from({length: 100}, (_, i) => ({ 
                                     id: i,
@@ -120,7 +120,7 @@ const resolveActions = (gameId) => {
         game.actions.forEach(action => {
             switch(action.type){
                 case 'movement':
-                    const unit = game.units.find(u => u.id === action.unitId);
+                    const unit = game.units.get(action.unitId);
                     if(!unit) break;
 
                     progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
@@ -150,13 +150,15 @@ const resolveActions = (gameId) => {
 
                         unit.sight = calculateSight(Math.round(unit.x), Math.round(unit.z))
 
-                        const allPlayerUnits = game.units.filter(u => u.player === player.socketId);
-                        const allPlayerBuildings = game.buildings.filter(b => b.player === player.socketId);
+                        const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
+                        const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
+                        const playerBuildings = game.buildings.filter(b => b.player === player.socketId);
 
                         player.sight = [
                             ...new Set([
-                                ...allPlayerUnits.flatMap(u => u.sight),
-                                ...allPlayerBuildings.flatMap(b => b.sight),
+                                ...playerUnits.flatMap(u => u.sight),
+                                ...unit.sight, // add the freshly calculated sight
+                                ...playerBuildings.flatMap(b => b.sight),
                             ])
                         ];
 
@@ -202,10 +204,19 @@ const resolveActions = (gameId) => {
                             actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
                         }
 
-                        game.units.push(gatherNode)
+                        // set in units Map
+                        game.units.set(gatherNode.id, gatherNode);
+                        // ALSO set in unitsByPlayer Map (in the name of performance)
+                        if (!game.unitsByPlayer.has(player.socketId)) {
+                            game.unitsByPlayer.set(player.socketId, new Set());
+                        }
+                        // here we add the id to the unitsByPlayer map, which contain a Set of ids. Not the unit itself
+                        game.unitsByPlayer.get(player.socketId).add(gatherNode.id);
 
                         if(playerSocket){
-                            playerSocket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
+                            const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
+                            const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
+                            playerSocket.emit('player-units-update', { units: playerUnits });
                             playerSocket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
                         } 
                     }
@@ -224,7 +235,7 @@ const gameDisconnect = (socket) => {
     const game = gamesByStarted.get(socket.id);
 
     if(game){
-        intervals = intervals.filter(i => i.gameId !== game.id);
+        intervals.delete(game.id)
     }
 
     // Delete games this socket started
@@ -315,25 +326,9 @@ io.on('connection', (socket) => {
                     position: null,
                     yield: 100,
                 }
-            ], // define the resource object and coordinates
-            units: [
-                {
-                    id: randomUUID(),
-                    hackId: randomUUID(), // the hackId is NOT the id of the unit. Players cannot know the id. And only if they use specific skills, they can discover the hackId and use it to hack into a unit or building.
-                    mobile: true,
-                    name: 'Gather Node', // It can do everything, but its SPECIALIZED in gathering, so its throughput is MAX when gathering, as opposed to other nodes
-                    model: 'gather-node',
-                    player: socket.id, // IMPORTANT: if player is null, it means its NOT controlled by ANY player.
-                    sight: [],
-                    x: 0,
-                    z: 0,
-                    position: null,
-                    speed: 3, // tiles per second
-                    integrity: 100, // essentially, the HP of machines
-                    material: 'iron', // material the structure of the machine is built off. Other option is: steel. An upgrade. Structure resists MORE.
-                    actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
-                }
             ],
+            units: new Map(),
+            unitsByPlayer: new Map(),
             buildings: [
                 {
                     id: randomUUID(),
@@ -370,44 +365,66 @@ io.on('connection', (socket) => {
             ],
         };
 
-        // we calculate the sight and positions of units
-        // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
-        // at this point we only have ONE player so we can place total sight here
-        // but later, in join-game event, we do this ONLY for the units and buildings of THAT player, not "all" (which here is just one: the first)
-        game.units = game.units.map(u => {
+        // create a starter unit
+        const starterUnit = {
+            id: randomUUID(),
+            hackId: randomUUID(),
+            mobile: true,
+            name: 'Gather Node',
+            model: 'gather-node',
+            player: socket.id,
+            sight: [],
+            x: 0,
+            z: 0,
+            position: null,
+            speed: 3,
+            integrity: 100,
+            material: 'iron',
+            actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
+        };
+
+        // add to units map
+        game.units.set(starterUnit.id, starterUnit);
+
+        // Add to unitsByPlayer map
+        // if unitsByPlayer does not have the socket.id, we add it and add a new Set
+        // this Set will track all unit.id(s) belonging to that player, it does not CONTAIN the unit, but it references the unit.id from the other map
+        if (!game.unitsByPlayer.has(socket.id)) {
+            game.unitsByPlayer.set(socket.id, new Set());
+        }
+        game.unitsByPlayer.get(socket.id).add(starterUnit.id);
+
+        // Now game.units is a Map()
+        game.units.forEach((u, unitId) => {
             const calculatedSight = calculateSight(u.x, u.z);
             const calculatedPosition = calculatePosition(u.x, u.z);
 
             game.players[0].sight.push(...calculatedSight);
-            // starting point, discovery is same as sight
-            game.players[0].discovered.push(...calculatedSight)
+            game.players[0].discovered.push(...calculatedSight);
 
             game.board = game.board.map(tile => {
                 if(tile.id === calculatedPosition){
                     return {
                         ...tile,
                         unit: u.id,
-                    }
+                    };
                 }
+                return {...tile};
+            });
 
-                return {...tile}
-            })
+            // update the unit object in the Map in-place
+            u.sight = calculatedSight;
+            u.position = calculatedPosition;
 
-            return {
-                ...u,
-                sight: calculatedSight,
-                position: calculatedPosition,
-            }
+            // optional
+            game.units.set(unitId, u);
         });
 
-        // we calculate the sight and positions of buildings
-        // we also assigned those calculatedPositions (tileIds) to the tiles of this game's board
         game.buildings = game.buildings.map(b => {
             const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
 
             game.players[0].sight.push(...calculatedSight);
-            // starting point, discovery is same as sight
             game.players[0].discovered.push(...calculatedSight)
 
             game.board = game.board.map(tile => {
@@ -428,8 +445,6 @@ io.on('connection', (socket) => {
             }
         });
 
-        // we calculate the position of resources (not sight)
-        // And assign those tiledIds to the board's tiles
         game.resources = game.resources.map(r => {
             const calculatedPosition = calculatePosition(r.x, r.z);
 
@@ -454,14 +469,13 @@ io.on('connection', (socket) => {
             drainElectricity(game.id);
             generateElectricity(game.id);
 
-            // resolveActions while filtering the resolvedOnes (by duration)
             if(game.actions.length > 0){
                 resolveActions(game.id);
                 console.log('actions in the actions array: ', game.actions);
             }
         }, 50)
 
-        intervals.push({gameId: game.id, interval: mainInterval});
+        intervals.set(game.id, mainInterval);
 
         games.set(game.id, game);
         gamesByRoom.set(game.room, game);
@@ -469,7 +483,10 @@ io.on('connection', (socket) => {
 
         io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime })));
         
-        const safeGameData = { ...game };
+        const safeGameData = { 
+            ...game,
+            units: Array.from(game.units.values()),
+        };
         delete safeGameData.id;
 
         socket.emit('starting-game-data', safeGameData);
@@ -497,11 +514,22 @@ io.on('connection', (socket) => {
             }
             
             // Update units owned by old socket
-            game.units.forEach(u => {
-            if (u.player === originalSocketId) {
-                u.player = socket.id
+            const playerUnitIds = game.unitsByPlayer.get(originalSocketId) || new Set();
+
+            // Update the player reference on each unit
+            playerUnitIds.forEach(unitId => {
+                const unit = game.units.get(unitId);
+                if (unit) unit.player = socket.id;
+            });
+
+            // Move the unit IDs to the new key in unitsByPlayer
+            if (!game.unitsByPlayer.has(socket.id)) {
+                game.unitsByPlayer.set(socket.id, new Set());
             }
-            })
+            // we can do this ONLY because of previous code block where if it doenst exist, we add the socket.id
+            const newSet = game.unitsByPlayer.get(socket.id);
+            playerUnitIds.forEach(id => newSet.add(id));
+            game.unitsByPlayer.delete(originalSocketId);
             
             // Update buildings owned by old socket
             game.buildings.forEach(b => {
@@ -510,8 +538,15 @@ io.on('connection', (socket) => {
             }
             })
             
+            // Join the room
             socket.join(gameRoom)
-            socket.emit('starting-game-data', game)
+
+            const safeGameData = {
+                ...game,
+                units: Array.from(game.units.values()),
+            };
+
+            socket.emit('starting-game-data', safeGameData);
         }
     })
 
@@ -527,7 +562,7 @@ io.on('connection', (socket) => {
 
         // also clean the intervals attached to that gameId
         if(game){
-            intervals = intervals.filter(i => i.gameId !== game.id);
+            intervals.delete(game.id);
         }
 
         // Delete games this socket started
@@ -547,7 +582,7 @@ io.on('connection', (socket) => {
         const game = gamesByRoom.get(data.room);
 
         if(game){
-            const unit = game.units.find(u => u.id === data.unitId);
+            const unit = game.units.get(data.unitId);
 
             if(unit){
                 // if unit is already moving, remove any type: 'movement' actions from array
@@ -595,7 +630,7 @@ io.on('connection', (socket) => {
         console.log(data);
         if(game){
             if(data.selected.mobile === true){
-                const unit = game.units.find(u => u.id === data.selected.id);
+                const unit = game.units.get(data.selected.id);
             } else {
                 const building = game.buildings.find(b => b.id === data.selected.id);
 
