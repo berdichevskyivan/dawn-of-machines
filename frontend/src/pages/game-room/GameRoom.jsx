@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -185,7 +185,7 @@ function Tile({position, tile, moveToTile}){
     )
 }
 
-function SelectionRing({position}){
+const SelectionRing = React.memo(function SelectionRing({position}){
 
     const selectionRingRef = useRef();
 
@@ -199,9 +199,9 @@ function SelectionRing({position}){
             <meshBasicMaterial color="yellow" /> 
         </mesh>
     )
-}
+});
 
-function Unit({position, unit, selectUnit}){
+const Unit = React.memo(function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
 
     useFrame((state, delta) => {
@@ -225,9 +225,9 @@ function Unit({position, unit, selectUnit}){
             <meshStandardMaterial color="yellow" />
         </mesh>
     )
-}
+});
 
-function Building({position, building, selectBuilding}){
+const Building = React.memo(function Building({position, building, selectBuilding}){
     const buildingRef = useRef();
 
     return (
@@ -243,9 +243,9 @@ function Building({position, building, selectBuilding}){
             <meshStandardMaterial color="yellow" />
         </mesh>
     )
-}
+});
 
-function MapResource({position, mapResource, selectMapResource}){
+const MapResource = React.memo(function MapResource({position, mapResource, selectMapResource}){
     const mapResourceRef = useRef();
 
     return (
@@ -260,7 +260,7 @@ function MapResource({position, mapResource, selectMapResource}){
             <meshStandardMaterial color="yellow" />
         </mesh>
     )
-}
+});
 
 function Clock({ startingTime }) {
     const [elapsed, setElapsed] = useState(Date.now() - startingTime);
@@ -506,6 +506,23 @@ function GameRoom({socket}){
     const offsetX = maxX / 2;
     const offsetZ = maxZ / 2;
 
+    // Precomputes positions so it does NOT need to create a new array literal every time it create an entity
+    // Tiles
+    const visibleTiles = board.filter(tile => discovered?.includes(tile.id));
+    const tilePositions = visibleTiles.map(t => [t.x - offsetX, 0, t.z - offsetZ]);
+
+    // Units
+    const visibleUnits = units.filter(u => sight?.includes(u.position));
+    const unitPositions = visibleUnits.map(u => [u.x - offsetX, 0, u.z - offsetZ]);
+
+    // Buildings
+    const visibleBuildings = buildings.filter(b => sight?.includes(b.position));
+    const buildingPositions = visibleBuildings.map(b => [b.x - offsetX, 0, b.z - offsetZ]);
+
+    // Map Resources
+    const visibleResources = mapResources.filter(mr => sight?.includes(mr.position));
+    const resourcePositions = visibleResources.map(r => [r.x - offsetX, 0, r.z - offsetZ]);
+
     return (
         <div className="game-room-container">
             { resources && (
@@ -638,35 +655,31 @@ function GameRoom({socket}){
                 <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
 
                 {/* Tiles */}
-                {/* Tiles must be filtered by discovered, instead of sight */}
-                { board.length > 0 && board.filter(tile => discovered?.includes(tile.id)).map((tile, index) => (
-                    <Tile key={index} position={[tile.x - offsetX, 0, tile.z - offsetZ]} tile={tile} moveToTile={moveToTile} />
+                { visibleTiles.map((tile, i) => (
+                    <Tile key={tile.id} position={tilePositions[i]} tile={tile} moveToTile={moveToTile} />
                 ))}
 
                 {/* Units */}
-                {/* All Units, must be filtered by sight */}
-                { units.length > 0 && units.filter(unit=>sight?.includes(unit.position)).map((unit, index) => (
+                { visibleUnits.map((unit, i) => (
                     <>
-                        <Unit key={index} position={[unit.x - offsetX, 0, unit.z - offsetZ]} unit={unit} selectUnit={selectUnit}/>
-                        { selected && selected.id === unit.id && (<SelectionRing position={[unit.x - offsetX, 0, unit.z - offsetZ]} />)}
+                        <Unit key={unit.id} position={unitPositions[i]} unit={unit} selectUnit={selectUnit}/>
+                        { selected && selected.id === unit.id && (<SelectionRing position={unitPositions[i]} />)}
                     </>
                 ))}
 
                 {/* Buildings */}
-                {/* All Buildings, must be filtered by sight */}
-                { buildings.length > 0 && buildings.filter(building=>sight?.includes(building.position)).map((building, index) => (
+                { visibleBuildings.map((building, i) => (
                     <>
-                        <Building key={index} position={[building.x - offsetX, 0, building.z - offsetZ]} building={building} selectBuilding={selectBuilding}/>
-                        { selected && selected.id === building.id && (<SelectionRing position={[building.x - offsetX, 0, building.z - offsetZ]} />)}
+                        <Building key={building.id} position={buildingPositions[i]} building={building} selectBuilding={selectBuilding}/>
+                        { selected && selected.id === building.id && (<SelectionRing position={buildingPositions[i]} />)}
                     </>
                 ))}
 
                 {/* Map Resources */}
-                {/* All Map Resources, must be filtered by sight */}
-                { mapResources.length > 0 && mapResources.filter(mr => sight?.includes(mr.position)).map((mapResource, index) => (
+                { visibleResources.map((mapResource, i) => (
                     <>
-                        <MapResource key={index} position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} mapResource={mapResource} selectMapResource={selectMapResource}/>
-                        { selected && selected.id === mapResource.id && (<SelectionRing position={[mapResource.x - offsetX, 0, mapResource.z - offsetZ]} />)}
+                        <MapResource key={mapResource.id} position={resourcePositions[i]} mapResource={mapResource} selectMapResource={selectMapResource}/>
+                        { selected && selected.id === mapResource.id && (<SelectionRing position={resourcePositions[i]} />)}
                     </>
                 ))}
 

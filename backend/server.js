@@ -118,10 +118,6 @@ const resolveActions = (gameId) => {
         game.actions.forEach(action => {
             switch(action.type){
                 case 'movement':
-                    // HERE is where we do the recalculations derived from movement
-                    // We need to recalculate the sight of the unit
-                    // We need to recalculate the sight of the player
-                    // We need to recalculate unit, building or resource from the specific tile of the specific board, and update it to null if dissocupied
                     const unit = game.units.find(u => u.id === action.unitId);
                     if(!unit) break;
 
@@ -129,27 +125,20 @@ const resolveActions = (gameId) => {
 
                     unit.x = action.startX + (action.destinationX - action.startX) * progress;
                     unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
-                    // Previous position can be accessed HERE
+
                     const previousPosition = unit.position;
-                    // Movement happens HERE
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
 
-                    // Only then we update. if there was a change
                     if(previousPosition !== unit.position){
-                        // We get the tile for the previous position
                         const previousPositionTile = game.board.find(tile => tile.id === previousPosition);
-                        // Set to null, unit is NOT there anymore
-                        previousPositionTile.unit = null;
-                        // Now we get the new tile the unit is on
+                        if(previousPositionTile) previousPositionTile.unit = null;
                         const newPositionTile = game.board.find(tile => tile.id === unit.position);
-                        newPositionTile.unit = unit.id;
+                        if(newPositionTile) newPositionTile.unit = unit.id;
                     }
 
                     player = game.players.find(p => p.socketId === unit.player);
 
                     if(player){
-                        // we remove the previous sight of this unit from the player's sight array
-                        // We riding that O(n)
                         for (const tileId of unit.sight) {
                             const index = player.sight.indexOf(tileId);
                             if (index !== -1) {
@@ -157,10 +146,8 @@ const resolveActions = (gameId) => {
                             }
                         }
 
-                        // recalculate sight and assign
                         unit.sight = calculateSight(Math.round(unit.x), Math.round(unit.z))
 
-                        // recompute total player sight from ALL entities
                         const allPlayerUnits = game.units.filter(u => u.player === player.socketId);
                         const allPlayerBuildings = game.buildings.filter(b => b.player === player.socketId);
 
@@ -171,12 +158,10 @@ const resolveActions = (gameId) => {
                             ])
                         ];
 
-                        // adds to player.discovered and deduplicates by using a Set
                         player.discovered = [
                             ...new Set([...player.discovered, ...unit.sight])
                         ];
 
-                        // now we emit ONLY to the socket of the player
                         const playerSocket = sockets.find(s => s.socketId === player.socketId);
 
                         if(playerSocket) playerSocket.socket.emit('sight-discovery-update', { sight: player.sight, discovered: player.discovered })
