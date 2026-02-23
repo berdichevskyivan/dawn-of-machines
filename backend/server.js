@@ -26,7 +26,8 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                 }))
 
 const actionsMap = {
-    'build-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] }, // default values: duration, cost
+    'build-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+    'build-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }] },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
 
@@ -375,7 +376,10 @@ io.on('connection', (socket) => {
                 position: null,
                 integrity: 100,
                 material: 'iron',
-                actions: [{ type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] }],
+                actions: [
+                    { type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] },
+                    { type: 'build-combat-node', title: 'Build Combat Node', duration: actionsMap['build-combat-node'] }
+                ],
             },
             {
                 id: randomUUID(),

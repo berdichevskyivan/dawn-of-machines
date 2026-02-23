@@ -14,6 +14,7 @@ const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
 
 const actionIconsMap = {
     'build-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'build-combat-node': <GatherNodeIcon color="#00FF00" size={50} />, // For now we use the same Icon
     'gather': <GatherNodeIcon color="#00FF00" size={50} />,
 }
 
@@ -501,6 +502,28 @@ function GameRoom({socket}){
         }
     }, []);
 
+    const KEYBINDS = ["q", "w", "e", "r", "t"];
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!selected?.actions?.length) return;
+
+            const active = document.activeElement;
+            if(active && ["INPUT", "TEXTAREA"].includes(active.tagName)) return;
+
+            const key = e.key.toLowerCase();
+            const index = KEYBINDS.indexOf(key);
+
+            if (index === -1) return;
+            if (!selected.actions[index]) return;
+
+            startAction(selected.actions[index].type);
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selected, startAction]);
+
     // think of this as a diagonal cutting from center of the first tile
     // towards the center of the last tile
     const maxX = Math.max(...board.map(t => t.x));
@@ -691,8 +714,15 @@ function GameRoom({socket}){
                             <div className="actions-container">
                                 { selected && selected.actions && selected.actions.length > 0 && (
                                     <>
-                                        { selected.actions.map(action => (
+                                        { selected.actions.map((action, index) => (
                                             <div className="action-container" onClick={(e) => {startAction(action.type)}}>
+                                                <div className="action-bound-key">
+                                                    { index === 0 && (<p>Q</p>)}
+                                                    { index === 1 && (<p>W</p>)}
+                                                    { index === 2 && (<p>E</p>)}
+                                                    { index === 3 && (<p>R</p>)}
+                                                    { index === 4 && (<p>T</p>)}
+                                                </div>
                                                 <div className="action-icon">
                                                     { actionIconsMap[action.type] }
                                                 </div>
