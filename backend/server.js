@@ -30,6 +30,8 @@ const actionsMap = {
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
 
+const oppositeRound = x => Math.round(x) + (Math.round(x) > x ? -1 : (Math.round(x) < x ? 1 : 0));
+
 const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
     const deltas = [
         [0, 0],   // self
@@ -154,7 +156,8 @@ const resolveActions = (gameId) => {
                             }
                         }
 
-                        unit.sight = calculateSight(Math.round(unit.x), Math.round(unit.z))
+                        // This works 
+                        unit.sight = [...calculateSight(Math.round(unit.x), Math.round(unit.z)), ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))];
 
                         const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
                         const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
@@ -162,11 +165,9 @@ const resolveActions = (gameId) => {
                         const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
 
                         player.sight = [
-                            ...new Set([
-                                ...playerUnits.flatMap(u => u.sight),
-                                ...unit.sight,
-                                ...playerBuildings.flatMap(b => b.sight),
-                            ])
+                            ...playerUnits.flatMap(u => u.sight),
+                            ...unit.sight,
+                            ...playerBuildings.flatMap(b => b.sight),
                         ];
 
                         player.discovered = [
