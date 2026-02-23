@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -203,9 +203,11 @@ const SelectionRing = React.memo(function SelectionRing({position}){
 
 const Unit = React.memo(function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
+    const lastPos = useRef([position[0], position[2]]);
 
     useFrame((state, delta) => {
         if(!unitRef.current) return;
+        if (lastPos.current[0] === position[0] && lastPos.current[1] === position[2]) return;
         
         const smoothTime = 0.1; // seconds to smooth movement
         unitRef.current.position.x += (position[0] - unitRef.current.position.x) * (delta / smoothTime);
@@ -506,22 +508,17 @@ function GameRoom({socket}){
     const offsetX = maxX / 2;
     const offsetZ = maxZ / 2;
 
-    // Precomputes positions so it does NOT need to create a new array literal every time it create an entity
-    // Tiles
-    const visibleTiles = board.filter(tile => discovered?.includes(tile.id));
-    const tilePositions = visibleTiles.map(t => [t.x - offsetX, 0, t.z - offsetZ]);
+    const visibleTiles = useMemo(() => board.filter(tile => discovered?.includes(tile.id)), [board, discovered]);
+    const tilePositions = useMemo(() => visibleTiles.map(t => [t.x - offsetX, 0, t.z - offsetZ]), [visibleTiles, offsetX, offsetZ]);
 
-    // Units
-    const visibleUnits = units.filter(u => sight?.includes(u.position));
-    const unitPositions = visibleUnits.map(u => [u.x - offsetX, 0, u.z - offsetZ]);
+    const visibleUnits = useMemo(() => units.filter(u => sight?.includes(u.position)), [units, sight]);
+    const unitPositions = useMemo(() => visibleUnits.map(u => [u.x - offsetX, 0, u.z - offsetZ]), [visibleUnits, offsetX, offsetZ]);
 
-    // Buildings
-    const visibleBuildings = buildings.filter(b => sight?.includes(b.position));
-    const buildingPositions = visibleBuildings.map(b => [b.x - offsetX, 0, b.z - offsetZ]);
+    const visibleBuildings = useMemo(() => buildings.filter(b => sight?.includes(b.position)), [buildings, sight]);
+    const buildingPositions = useMemo(() => visibleBuildings.map(b => [b.x - offsetX, 0, b.z - offsetZ]), [visibleBuildings, offsetX, offsetZ]);
 
-    // Map Resources
-    const visibleResources = mapResources.filter(mr => sight?.includes(mr.position));
-    const resourcePositions = visibleResources.map(r => [r.x - offsetX, 0, r.z - offsetZ]);
+    const visibleResources = useMemo(() => mapResources.filter(mr => sight?.includes(mr.position)), [mapResources, sight]);
+    const resourcePositions = useMemo(() => visibleResources.map(r => [r.x - offsetX, 0, r.z - offsetZ]), [visibleResources, offsetX, offsetZ]);
 
     return (
         <div className="game-room-container">

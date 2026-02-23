@@ -11,9 +11,11 @@ const io = new Server(server, {
     }
 });
 
-let games = []; // this array contains all the currently active games
-let intervals = []; // this array contains all the intervals related to games (linked by gameId)
-let sockets = []; // here we store the socketId and the socket itself
+let games = new Map();
+let gamesByRoom = new Map();
+let gamesByStarted = new Map();
+let intervals = []; // TODO: Change to map
+let sockets = new Map();
 const boardTemplate = Array.from({length: 100}, (_, i) => ({ 
                                     id: i,
                                     x: i % 10,
@@ -63,7 +65,7 @@ const calculatePosition = (x, z, boardWidth = 10) => {
 }
 
 const drainElectricity = (gameId) => {
-    const game = games.find(g => g.id === gameId);
+    const game = games.get(gameId);
 
     if(game){
         game.players.forEach(player => {
@@ -75,10 +77,10 @@ const drainElectricity = (gameId) => {
                 // immediately delete all actions
                 game.actions = []
 
-                const playerSocket = sockets.find(s => s.socketId === player.socketId);
+                const playerSocket = sockets.get(player.socketId);
                 if (playerSocket){
-                    playerSocket.socket.emit('game-disconnect');
-                    gameDisconnect(playerSocket.socket);
+                    playerSocket.emit('game-disconnect');
+                    gameDisconnect(playerSocket);
                 } 
             }
 
@@ -86,14 +88,14 @@ const drainElectricity = (gameId) => {
             player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.5;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
-            const playerSocket = sockets.find(s => s.socketId === player.socketId);
-            if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
+            const playerSocket = sockets.get(player.socketId);
+            if (playerSocket) playerSocket.emit('player-update', { playerData: player });
         })
     }
 }
 
 const generateElectricity = (gameId) => {
-    const game = games.find(g => g.id === gameId);
+    const game = games.get(gameId);
 
     if(game){
         game.players.forEach(player => {
@@ -102,14 +104,14 @@ const generateElectricity = (gameId) => {
             player.resources.electricity += playerGenerators.length * 0.15;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
-            const playerSocket = sockets.find(s => s.socketId === player.socketId);
-            if (playerSocket) playerSocket.socket.emit('player-update', { playerData: player });
+            const playerSocket = sockets.get(player.socketId);
+            if (playerSocket) playerSocket.emit('player-update', { playerData: player });
         })
     }
 }
 
 const resolveActions = (gameId) => {
-    const game = games.find(g => g.id === gameId);
+    const game = games.get(gameId);
 
     if(game){
         // now iterate over the actions
@@ -162,9 +164,9 @@ const resolveActions = (gameId) => {
                             ...new Set([...player.discovered, ...unit.sight])
                         ];
 
-                        const playerSocket = sockets.find(s => s.socketId === player.socketId);
+                        const playerSocket = sockets.get(player.socketId);
 
-                        if(playerSocket) playerSocket.socket.emit('sight-discovery-update', { sight: player.sight, discovered: player.discovered })
+                        if(playerSocket) playerSocket.emit('sight-discovery-update', { sight: player.sight, discovered: player.discovered })
                     }
 
                     io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
@@ -179,7 +181,7 @@ const resolveActions = (gameId) => {
 
                     progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
                     player = game.players.find(p => p.socketId === building.player);
-                    const playerSocket = sockets.find(s => s.socketId === player.socketId);
+                    const playerSocket = sockets.get(player.socketId);
 
                     // Once we compute the progress, we perform the intended action
                     if(progress >= 1){
@@ -203,12 +205,12 @@ const resolveActions = (gameId) => {
                         game.units.push(gatherNode)
 
                         if(playerSocket){
-                            playerSocket.socket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
-                            playerSocket.socket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
+                            playerSocket.emit('player-units-update', { units: game.units.filter(u => u.player === player.socketId) });
+                            playerSocket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
                         } 
                     }
 
-                    if(playerSocket) playerSocket.socket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
+                    if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
 
                     break;
             }
@@ -219,14 +221,20 @@ const resolveActions = (gameId) => {
 }
 
 const gameDisconnect = (socket) => {
-    const game = games.find(g => g.startingSocketId === socket.id);
+    const game = gamesByStarted.get(socket.id);
 
     if(game){
         intervals = intervals.filter(i => i.gameId !== game.id);
     }
 
     // Delete games this socket started
-    games = games.filter(g => g.startingSocketId !== socket.id);
+    for (const [gameId, game] of games.entries()) {
+        if (game.startingSocketId === socket.id) {
+            games.delete(gameId);
+            gamesByRoom.delete(game.room);
+            gamesByStarted.delete(socket.id);
+        }
+    }
 }
 
 io.on('connection', (socket) => {
@@ -234,22 +242,22 @@ io.on('connection', (socket) => {
 
     // If it does NOT find the socket, push it
     // If it finds it, skip
-    if(!sockets.find(s => s.socketId === socket.id)){
-        sockets.push({ socketId: socket.id, socket: socket })
+    if(!sockets.get(socket.id)){
+        sockets.set(socket.id, socket);
     }
 
     socket.on('disconnect', () => {
         console.log('user disconnected');
-        if(sockets.find(s => s.socketId === socket.id)){
+        if(sockets.get(socket.id)){
             // this is to give time for reconnection
             setTimeout(()=>{
-                sockets = sockets.filter(s => s.socketId !== socket.id);
+                sockets.delete(socket.id);
             }, 2000)
         }
     });
 
     socket.on('games-fetch', () => {
-        io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
+        io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime })));
     });
 
     socket.on('game-start', () => {
@@ -483,11 +491,13 @@ io.on('connection', (socket) => {
         // store than main interval id somewhere for cleaning afterwards. The interval sends state changes to the player but ONLY the player data
 
         // for now, we move onto just adding this bare bones game object to see it show in the /games page
-        games.push(game);
+        games.set(game.id, game);
+        gamesByRoom.set(game.room, game);
+        gamesByStarted.set(socket.id, game);
 
         // we tell all clients a game has started can be viewed in /games page
-        io.emit('games-update', games.map(g => ({title: g.title, startingTime: g.startingTime})));
-
+        io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime })));
+        
         // Neccesary data to start the board
         // Remove id
         const safeGameData = { ...game };
@@ -497,7 +507,7 @@ io.on('connection', (socket) => {
     })
 
     socket.on('player-reconnect', ({ originalSocketId, gameRoom }) => {
-        const game = games.find(g => g.room === gameRoom)
+        const game = gamesByRoom.get(gameRoom);
         if (!game) return
 
         const player = game.players.find(p => p.socketId === originalSocketId)
@@ -511,14 +521,10 @@ io.on('connection', (socket) => {
                 game.startingSocketId = socket.id; // we ALSO update the startingSocketId
             }
 
-            // Also update socket id in sockets array
-            // I see. The socket id immediately disconnects so we need to remove it from 
-            // the sockets array more slowly
-            const socketToUpdate = sockets.find(s => s.socketId === originalSocketId);
-
-            if(socketToUpdate){
-                socketToUpdate.socketId = socket.id; // the new id
-                socketToUpdate.socket = socket; // the new socket itself
+            const oldSocket = sockets.get(originalSocketId);
+            if (oldSocket) {
+                sockets.delete(originalSocketId);      // remove old key
+                sockets.set(socket.id, socket);        // add new key
             }
             
             // Update units owned by old socket
@@ -541,14 +547,14 @@ io.on('connection', (socket) => {
     })
 
     socket.on('player-disconnect', () => {
-        if(sockets.find(s => s.socketId === socket.id)){
+        if(sockets.get(socket.id)){
             // Grace time: 2s
             setTimeout(()=>{
-                sockets = sockets.filter(s => s.socketId !== socket.id);
+                sockets.delete(socket.id);
             }, 2000)
         }
 
-        const game = games.find(g => g.startingSocketId === socket.id);
+        const game = gamesByStarted.get(socket.id);
 
         // also clean the intervals attached to that gameId
         if(game){
@@ -556,14 +562,20 @@ io.on('connection', (socket) => {
         }
 
         // Delete games this socket started
-        games = games.filter(g => g.startingSocketId !== socket.id);
+        for (const [gameId, game] of games.entries()) {
+            if (game.startingSocketId === socket.id) {
+                games.delete(gameId);
+                gamesByRoom.delete(game.room);
+                gamesByStarted.delete(socket.id);
+            }
+        }
     })
 
     // A socket requests movement
     socket.on('movement', (data)=>{
         console.log(`socket ${socket.id} in room ${data.room} requested movement for unit ${data.unitId} to tile ${data.tileId}`);
 
-        const game = games.find(g => g.room === data.room);
+        const game = gamesByRoom.get(data.room);
 
         if(game){
             const unit = game.units.find(u => u.id === data.unitId);
@@ -615,7 +627,7 @@ io.on('connection', (socket) => {
         // we STAMP starting time here. (Date.now())
         console.log(`socket ${socket.id} in room ${data.room} requested an action for selected id ${data.selected.id}`);
 
-        const game = games.find(g => g.room === data.room);
+        const game = gamesByRoom.get(data.room);
         console.log(data);
         if(game){
             if(data.selected.mobile === true){
