@@ -75,6 +75,29 @@ const drainElectricity = (gameId) => {
             // just existing drains a percentage, start with this
             player.resources.electricity -= 0.1; // rate for dev :) 
 
+            if(player.thresholdState === undefined) player.thresholdState = null;
+
+            let newThreshold = null;
+
+            if(player.resources.electricity <= 10) newThreshold = 'fatal';
+            else if(player.resources.electricity <= 25) newThreshold = 'critical';
+            else if(player.resources.electricity <= 50) newThreshold = 'alert';
+
+            // Only push a new action if the threshold just changed
+            if(newThreshold !== player.thresholdState){
+                player.thresholdState = newThreshold;
+
+                if(newThreshold){
+                    game.actions.push({
+                        id: randomUUID(),
+                        playerId: player.socketId,
+                        type: `electricity-threshold-${newThreshold}`,
+                        startingTime: Date.now(),
+                        duration: 1,
+                    });
+                }
+            }
+
             // if player started the game and electricity equals zero, halt everything, disconnect the game
             if(player.startedGame && player.resources.electricity <= 0){
                 // immediately delete all actions
@@ -126,8 +149,24 @@ const resolveActions = (gameId) => {
         // now iterate over the actions
         let progress = null;
         let player = null;
+        let playerSocket = null;
         game.actions.forEach(action => {
             switch(action.type){
+                case 'electricity-threshold-alert':
+                    player = game.players.find(p => p.socketId === action.playerId);
+                    playerSocket = sockets.get(player.socketId);
+                    if(playerSocket) playerSocket.emit('logs-update', { log: '[ALERT] Electricity dropped below 50.' });
+                    break;
+                case 'electricity-threshold-critical':
+                    player = game.players.find(p => p.socketId === action.playerId);
+                    playerSocket = sockets.get(player.socketId);
+                    if(playerSocket) playerSocket.emit('logs-update', { log: '[CRITICAL] Electricity dropped below 25.' });
+                    break;
+                case 'electricity-threshold-fatal':
+                    player = game.players.find(p => p.socketId === action.playerId);
+                    playerSocket = sockets.get(player.socketId);
+                    if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
+                    break;
                 case 'movement':
                     const unit = game.units.get(action.unitId);
                     if(!unit) break;
@@ -175,7 +214,7 @@ const resolveActions = (gameId) => {
                             ...new Set([...player.discovered, ...unit.sight])
                         ];
 
-                        const playerSocket = sockets.get(player.socketId);
+                        playerSocket = sockets.get(player.socketId);
 
                         if(playerSocket) playerSocket.emit('sight-discovery-update', { sight: player.sight, discovered: player.discovered })
                     }
@@ -184,12 +223,39 @@ const resolveActions = (gameId) => {
                     break;
                 case 'build-gather-node':
                     const building = game.buildings.get(action.buildingId);
-
                     if(!building) break;
 
-                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
                     player = game.players.find(p => p.socketId === building.player);
-                    const playerSocket = sockets.get(player.socketId);
+                    playerSocket = sockets.get(player.socketId);
+
+                    if(action.paused) {
+                        // Try to unpause if resources are back
+                        const canResume = action.costPaid.every(cost => {
+                            const targetPaid = cost.amount * ((Date.now() - action.startingTime) / action.duration);
+                            return player.resources[cost.resource] >= (targetPaid - cost.amountPaid);
+                        });
+                        if(canResume) action.paused = false;
+                        else {
+                            if(playerSocket) playerSocket.emit('logs-update', { log: `Action paused: insufficient resources.`, type: 'action-paused' });
+                            break; // skip tick
+                        }
+                    }
+
+                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                    // Deduct costs progressively
+                    action.costPaid.forEach(cost => {
+                        const targetPaid = cost.amount * progress;
+                        const delta = targetPaid - cost.amountPaid;
+                        if(delta > 0){
+                            if(player.resources[cost.resource] >= delta){
+                                player.resources[cost.resource] -= delta;
+                                cost.amountPaid += delta;
+                            } else {
+                                action.paused = true;
+                            }
+                        }
+                    });
 
                     // Once we compute the progress, we perform the intended action
                     if(progress >= 1){
@@ -664,6 +730,25 @@ io.on('connection', (socket) => {
 
         const game = gamesByRoom.get(data.room);
         if(game){
+
+            // Check if player has the resources to cost that action
+            const player = game.players.find(p => p.socketId === socket.id);
+            const actionCost = actionsMap[data.actionType].cost;
+
+            // Iterate over the cost (it can be more than one resource)
+            for (const cost of actionCost) {
+                if (player.resources[cost.resource] < cost.amount) {
+                    const playerSocket = sockets.get(player.socketId);
+                    playerSocket.emit('logs-update', {
+                        log: `Not enough resources. ${cost.amount} ${cost.resource} is required.`,
+                        type: 'error'
+                    });
+                    return; // exits socket.on handler
+                }else{
+                    console.log(`player has ${cost.amount} ${cost.resource}`)
+                }
+            }
+
             if(data.selected.mobile === true){
                 const unit = game.units.get(data.selected.id);
             } else {
@@ -676,6 +761,8 @@ io.on('connection', (socket) => {
                         buildingId: building.id,
                         startingTime: Date.now(),
                         duration: actionsMap[data.actionType].duration, // later you may add modifiers here or in resolveActions
+                        costPaid: actionCost.map(cost => ({ ...cost, amountPaid: 0 })),
+                        paused: false,
                     });
                 }
 
