@@ -29,6 +29,7 @@ const actionsMap = {
     'build-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
     'build-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }] },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
+    'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] }, // when duration is reached. Hack is completed.
 }
 
 const oppositeRound = x => Math.round(x) + (Math.round(x) > x ? -1 : (Math.round(x) < x ? 1 : 0));
@@ -406,6 +407,7 @@ io.on('connection', (socket) => {
             buildingsByType: new Map(),
         };
 
+        // REMEMBER: All units can do ALL things. But each has more efficiency in specific actions.
         // starter unit
         const starterUnit = {
             id: randomUUID(),
@@ -421,7 +423,10 @@ io.on('connection', (socket) => {
             speed: 3,
             integrity: 100,
             material: 'iron',
-            actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
+            actions: [
+                { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
+                { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
+            ],
         };
 
         game.units.set(starterUnit.id, starterUnit);

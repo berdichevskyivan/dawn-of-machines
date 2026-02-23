@@ -16,6 +16,7 @@ const actionIconsMap = {
     'build-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'build-combat-node': <GatherNodeIcon color="#00FF00" size={50} />, // For now we use the same Icon
     'gather': <GatherNodeIcon color="#00FF00" size={50} />,
+    'hack': <GatherNodeIcon color="#00FF00" size={50} />,
 }
 
 function ModelMapper({model, previewRef}){
