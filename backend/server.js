@@ -268,24 +268,9 @@ io.on('connection', (socket) => {
         const gameRoomName = `game-room-${(games.length+1).toString()}`;
 
         // later we verify if this gameRoomName already exist by iterating over games
-        // remember to also START THE CLOCK <- Super important. Start keeping track of time.
-
         socket.join(gameRoomName);
 
         // remember to later call socket.leave(gameRoomName) or socket.leave(game.room)
-
-        // every process that starts has an intervalId AND a starting time
-        // an action has a starting time. Lets say we start "an action", put it in the `actions` array (this is NOT the intervals array, those contain intervalIds and other things)
-        // so, the interval, lets say, every 50ms, checks the action array. If the action is `resolved` , it REMOVES the action from the action array, cleaning it
-        // an action takes a SET amount of time, so it takes the startingTime of the action, and compares to Date.now() -> Date.now() - startingTime = has much time passed
-        // startingTime and "timeToResolve" are different things. startingTime is when the action started, and timeToResolve is how long should this action take
-        // like this, we will manage the "actions" that occur on the board. Here, action is inpersonal, actions array carries ALL actions 
-
-        // TODO: units and buildings will be universal. What this means is as follows
-        // there will be NO units and buildings in each player , instead
-        // there will be a global units, and each of those units will tell you if: a) its owned by a player, b) its part of the world. If its owned by a player, it will tell you its UNIQUE id which is its socketId
-        // when selecting units, logic is: if you own those units, you CAN select them, if not , you can't . 
-        // this will allow local and global units and buildings to coexist coherently
 
         let game = {
             id: randomUUID(),
@@ -465,15 +450,6 @@ io.on('connection', (socket) => {
             }
         });
 
-        // here, we also add the actions that we want starting ALREADY, as we said everything is an action
-        // sight: action; movement: action; drain-electricity: action;
-        // the interval checks the clock and passes the task to the resolver
-        // once the resolver is done with the task, it updates the state of it
-        // the interval can remove the action if: 1) timeToResolve reached the limit 2) the action is "resolved"
-        // for example, we need to calculate SIGHT for each unit. SIGHT will tell us which TILE they see. 
-        // the Tile they see is calculated based on the X and Z of the object (unit or building) like x+1 x-1 z+1 z-1, then that matches an ID, THEN that id is pushed into an array called `sight` inside
-        // the unit of building
-
         const mainInterval = setInterval(()=>{
             drainElectricity(game.id);
             generateElectricity(game.id);
@@ -487,19 +463,12 @@ io.on('connection', (socket) => {
 
         intervals.push({gameId: game.id, interval: mainInterval});
 
-        // start main interval. Each 50ms. resolves or removes (resolver doest the ACTUAL change, interval checks time and determines if enough has passed. Thats it.)
-        // store than main interval id somewhere for cleaning afterwards. The interval sends state changes to the player but ONLY the player data
-
-        // for now, we move onto just adding this bare bones game object to see it show in the /games page
         games.set(game.id, game);
         gamesByRoom.set(game.room, game);
         gamesByStarted.set(socket.id, game);
 
-        // we tell all clients a game has started can be viewed in /games page
         io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime })));
         
-        // Neccesary data to start the board
-        // Remove id
         const safeGameData = { ...game };
         delete safeGameData.id;
 
@@ -618,11 +587,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // A socket receives an action
-    // We want to push into game.actions with minimal input from the user
-    // From the user, we need to know this
-    // - which action.type
-    // - which unit or building is performing this action
     socket.on('start-action', (data)=>{
         // we STAMP starting time here. (Date.now())
         console.log(`socket ${socket.id} in room ${data.room} requested an action for selected id ${data.selected.id}`);
