@@ -99,8 +99,14 @@ const generateElectricity = (gameId) => {
 
     if(game){
         game.players.forEach(player => {
-            // check in the array of buildings for generators belonging to this player
-            const playerGenerators = game.buildings.filter(b => b.type === 'generator');
+            // get the generator IDs from buildingsByType Map
+            const generatorIds = game.buildingsByType.get('generator') || new Set();
+
+            // map IDs to building objects
+            const playerGenerators = Array.from(generatorIds)
+                .map(id => game.buildings.get(id))
+                .filter(b => b && b.player === player.socketId);  // keep only this player's generators
+
             player.resources.electricity += playerGenerators.length * 0.15;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
@@ -152,12 +158,13 @@ const resolveActions = (gameId) => {
 
                         const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
                         const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
-                        const playerBuildings = game.buildings.filter(b => b.player === player.socketId);
+                        const playerBuildingIds = game.buildingsByPlayer.get(player.socketId) || new Set();
+                        const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
 
                         player.sight = [
                             ...new Set([
                                 ...playerUnits.flatMap(u => u.sight),
-                                ...unit.sight, // add the freshly calculated sight
+                                ...unit.sight,
                                 ...playerBuildings.flatMap(b => b.sight),
                             ])
                         ];
@@ -174,10 +181,7 @@ const resolveActions = (gameId) => {
                     io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
                     break;
                 case 'build-gather-node':
-                    console.log('executing action build-gather-node', action);
-                    // we dont update anything from the building so we dont need the building now
-                    // eventually yes, because we need to spawn the new node from adjacent tiles
-                    const building = game.buildings.find(b => b.id === action.buildingId);
+                    const building = game.buildings.get(action.buildingId);
 
                     if(!building) break;
 
@@ -258,7 +262,7 @@ io.on('connection', (socket) => {
     }
 
     socket.on('disconnect', () => {
-        console.log('user disconnected');
+        console.log(`socket ${socket.id} disconnected`);
         if(sockets.get(socket.id)){
             // this is to give time for reconnection
             setTimeout(()=>{
@@ -329,43 +333,12 @@ io.on('connection', (socket) => {
             ],
             units: new Map(),
             unitsByPlayer: new Map(),
-            buildings: [
-                {
-                    id: randomUUID(),
-                    hackId: randomUUID(), // the hackId is NOT the id of the unit. Players cannot know the id. And only if they use specific skills, they can discover the hackId and use it to hack into a unit or building.
-                    mobile: false,
-                    name: 'Assembly Plant',
-                    model: 'assembly-plant',
-                    type: 'assembly-plant',
-                    player: socket.id,
-                    sight: [],
-                    x: 1,
-                    z: 1,
-                    position: null,
-                    integrity: 100,
-                    material: 'iron',
-                    actions: [{ type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] }],
-                },
-                {
-                    id: randomUUID(),
-                    hackId: randomUUID(),
-                    mobile: false,
-                    name: 'Generator',
-                    model: 'generator',
-                    type: 'generator',
-                    player: socket.id,
-                    sight: [],
-                    x: 2,
-                    z: 2,
-                    position: null,
-                    integrity: 100,
-                    material: 'iron',
-                    actions: [],
-                }
-            ],
+            buildings: new Map(),
+            buildingsByPlayer: new Map(),
+            buildingsByType: new Map(),
         };
 
-        // create a starter unit
+        // starter unit
         const starterUnit = {
             id: randomUUID(),
             hackId: randomUUID(),
@@ -383,16 +356,65 @@ io.on('connection', (socket) => {
             actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
         };
 
-        // add to units map
         game.units.set(starterUnit.id, starterUnit);
 
-        // Add to unitsByPlayer map
-        // if unitsByPlayer does not have the socket.id, we add it and add a new Set
-        // this Set will track all unit.id(s) belonging to that player, it does not CONTAIN the unit, but it references the unit.id from the other map
+        // starter buildings
+        const starterBuildings = [
+            {
+                id: randomUUID(),
+                hackId: randomUUID(),
+                mobile: false,
+                name: 'Assembly Plant',
+                model: 'assembly-plant',
+                type: 'assembly-plant',
+                player: socket.id,
+                sight: [],
+                x: 1,
+                z: 1,
+                position: null,
+                integrity: 100,
+                material: 'iron',
+                actions: [{ type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] }],
+            },
+            {
+                id: randomUUID(),
+                hackId: randomUUID(),
+                mobile: false,
+                name: 'Generator',
+                model: 'generator',
+                type: 'generator',
+                player: socket.id,
+                sight: [],
+                x: 2,
+                z: 2,
+                position: null,
+                integrity: 100,
+                material: 'iron',
+                actions: [],
+            }
+        ];
+
+        starterBuildings.forEach(sb => game.buildings.set(sb.id, sb));
+
+        // add starter unit to unitsByPlayer
         if (!game.unitsByPlayer.has(socket.id)) {
             game.unitsByPlayer.set(socket.id, new Set());
         }
         game.unitsByPlayer.get(socket.id).add(starterUnit.id);
+
+        starterBuildings.forEach(sb => {
+            // by player
+            if(!game.buildingsByPlayer.has(socket.id)){
+                game.buildingsByPlayer.set(socket.id, new Set());
+            }
+            game.buildingsByPlayer.get(socket.id).add(sb.id);
+
+            // by type
+            if(!game.buildingsByType.has(sb.type)){
+                game.buildingsByType.set(sb.type, new Set());
+            }
+            game.buildingsByType.get(sb.type).add(sb.id);
+        });
 
         // Now game.units is a Map()
         game.units.forEach((u, unitId) => {
@@ -420,29 +442,26 @@ io.on('connection', (socket) => {
             game.units.set(unitId, u);
         });
 
-        game.buildings = game.buildings.map(b => {
+        // Now game.buildings is a Map()
+        game.buildings.forEach((b, buildingId) => {
             const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
 
             game.players[0].sight.push(...calculatedSight);
-            game.players[0].discovered.push(...calculatedSight)
+            game.players[0].discovered.push(...calculatedSight);
 
             game.board = game.board.map(tile => {
                 if(tile.id === calculatedPosition){
-                    return {
-                        ...tile,
-                        building: b.id,
-                    }
+                    return { ...tile, building: b.id };
                 }
+                return { ...tile };
+            });
 
-                return {...tile}
-            })
+            // update the building object in the Map in-place
+            b.sight = calculatedSight;
+            b.position = calculatedPosition;
 
-            return {
-                ...b,
-                sight: calculatedSight,
-                position: calculatedPosition,
-            }
+            game.buildings.set(buildingId, b);
         });
 
         game.resources = game.resources.map(r => {
@@ -471,7 +490,6 @@ io.on('connection', (socket) => {
 
             if(game.actions.length > 0){
                 resolveActions(game.id);
-                console.log('actions in the actions array: ', game.actions);
             }
         }, 50)
 
@@ -486,6 +504,7 @@ io.on('connection', (socket) => {
         const safeGameData = { 
             ...game,
             units: Array.from(game.units.values()),
+            buildings: Array.from(game.buildings.values()),
         };
         delete safeGameData.id;
 
@@ -527,23 +546,35 @@ io.on('connection', (socket) => {
                 game.unitsByPlayer.set(socket.id, new Set());
             }
             // we can do this ONLY because of previous code block where if it doenst exist, we add the socket.id
-            const newSet = game.unitsByPlayer.get(socket.id);
-            playerUnitIds.forEach(id => newSet.add(id));
-            game.unitsByPlayer.delete(originalSocketId);
+            const newUnitIdsSet = game.unitsByPlayer.get(socket.id);
+            playerUnitIds.forEach(id => newUnitIdsSet.add(id));
+            // game.unitsByPlayer.delete(originalSocketId);
             
             // Update buildings owned by old socket
-            game.buildings.forEach(b => {
-            if (b.player === originalSocketId) {
-                b.player = socket.id
-            }
+            // First we get the ids
+            const playerBuildingIds = game.buildingsByPlayer.get(originalSocketId) || new Set();
+
+            // Update references on each building
+            playerBuildingIds.forEach(buildingId => {
+                const building = game.buildings.get(buildingId);
+                if(building) building.player = socket.id;
             })
-            
+
+            // update building ids in the new added conditionally here
+            if(!game.buildingsByPlayer.has(socket.id)){
+                game.buildingsByPlayer.set(socket.id, new Set());
+            }
+            const newBuildingIdsSet = game.buildingsByPlayer.get(socket.id);
+            playerBuildingIds.forEach(id => newBuildingIdsSet.add(id));
+            // game.buildingsByPlayer.delete(originalSocketId); 
+
             // Join the room
             socket.join(gameRoom)
 
             const safeGameData = {
                 ...game,
                 units: Array.from(game.units.values()),
+                buildings: Array.from(game.buildings.values()),
             };
 
             socket.emit('starting-game-data', safeGameData);
@@ -627,12 +658,11 @@ io.on('connection', (socket) => {
         console.log(`socket ${socket.id} in room ${data.room} requested an action for selected id ${data.selected.id}`);
 
         const game = gamesByRoom.get(data.room);
-        console.log(data);
         if(game){
             if(data.selected.mobile === true){
                 const unit = game.units.get(data.selected.id);
             } else {
-                const building = game.buildings.find(b => b.id === data.selected.id);
+                const building = game.buildings.get(data.selected.id);
 
                 if(building){
                     game.actions.push({
