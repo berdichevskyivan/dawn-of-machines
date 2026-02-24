@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import BottomUIBar from '../../components/ui/bottom-ui-bar/BottomUIBar';
 import * as THREE from 'three';
 
 import './GameRoom.css';
@@ -15,12 +16,14 @@ const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
 const actionIconsMap = {
     'assemble-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'assemble-builder-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'assemble-scanner-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'assemble-combat-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'assemble-hacker-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-iron': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-carbon': <GatherNodeIcon color="#00FF00" size={50} />,
     'gather': <GatherNodeIcon color="#00FF00" size={50} />,
     'build': <GatherNodeIcon color="#00FF00" size={50} />,
+    'scan': <GatherNodeIcon color="#00FF00" size={50} />,
     'hack': <GatherNodeIcon color="#00FF00" size={50} />,
     'attack': <GatherNodeIcon color="#00FF00" size={50} />,
 }
@@ -300,6 +303,7 @@ function GameRoom({socket}){
     const mainControlsRef = useRef();
     const previewRef = useRef();
     const startingTimeRef = useRef(null);
+    const commsMainRef = useRef(null);
 
     const [board, setBoard] = useState([]);
     const [units, setUnits] = useState([]);
@@ -353,21 +357,10 @@ function GameRoom({socket}){
     }
 
     const moveToTile = (tileId) => {
-        // If nothing is selected, no movement can be done
         if(!selected){
             console.log('Nothing is selected!');
             return;
         }
-
-        // right now, we just move, but later
-        // we will differentiate between moving units and non-moving buildings
-        // TODO: units and buildings seem to be flowing to UNIFICATION, type: unit and type: building but what could be the name of the objects.
-        // Entities? Perhaps. It's possible.
-
-        // Ok. Here we emit. We NEED to know:
-        // The Tile the player wants to go to
-        // WHICH unit wants to go to that tile
-        // the game can be looked up by the server
         socket.emit('movement', { tileId, unitId: selected.id, room: gameRoom })
     }
 
@@ -424,6 +417,21 @@ function GameRoom({socket}){
             }]);
         })
 
+        socket.on('resources-update', (data) => {
+            setMapResources(data.map(resource => ({ ...resource })));
+            setSelected(previous => {
+                if (!previous) return previous;
+
+                const resource = data.find(resource => resource.id === previous.id);
+                if (!resource) return previous;
+
+                return { 
+                    ...previous, 
+                    yield: resource.yield 
+                };
+            });
+        });
+
         // Handles movement
         socket.on('movement-update', (data) => {
             setUnits(prev => prev.map(u => 
@@ -475,7 +483,7 @@ function GameRoom({socket}){
             const displayMinutes = totalMinutes % 60;
             const displayHours = Math.floor(totalMinutes / 60);
 
-            setLogs(prev => [...prev, `[${displayHours}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}] ${data.log}`]);
+            setLogs(prev => [...prev, `[${displayHours.toString().padStart(2, '0')}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}] ${data.log}`]);
         })
 
         socket.on('game-disconnect', () => {
@@ -530,6 +538,11 @@ function GameRoom({socket}){
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [selected, startAction]);
+
+    useEffect(() => {
+        if (!commsMainRef.current) return;
+        commsMainRef.current.scrollTop = commsMainRef.current.scrollHeight;
+    }, [logs]);
 
     // think of this as a diagonal cutting from center of the first tile
     // towards the center of the last tile
@@ -620,7 +633,7 @@ function GameRoom({socket}){
                                     {/* Inward pull increases proportionally with ring radius to maintain consistent visual sag. */}
                                 </svg>
                             </div>
-                            <h1>{resources.carbon}</h1>
+                            <h1>{Number(resources.carbon.toFixed(1))}</h1>
                         </div>
                         <div className="resource-field">
                             <div className="icon">
@@ -710,130 +723,21 @@ function GameRoom({socket}){
                     </>
                 ))}
 
-                {/* Bottom UI Bar */}
-                {/* This is a div by default */}
-                {/* We add another wrapper div because Html adds another wrapper div */}
-                {/* So we target that first div and then we have control over inner-wrapper */}
-                <Html wrapperClass="bottom-ui-bar" style={{pointerEvents: 'auto'}} >
-                    <div className="inner-wrapper" onPointerEnter={() => (mainControlsRef.current.enabled = false)} onPointerLeave={() => (mainControlsRef.current.enabled = true)}>
-                        {/* stopPropagation prevents the event from reaching the OrbitControls */}
-                        <div className="bottom-ui-panel left-panel" onContextMenu={(e) => { e.stopPropagation() }}>
-                            <div className="actions-container">
-                                { selected && selected.actions && selected.actions.length > 0 && (
-                                    <>
-                                        { selected.actions.map((action, index) => (
-                                            <div className="action-container" onClick={(e) => {startAction(action.type)}}>
-                                                <div className="action-bound-key">
-                                                    { index === 0 && (<p>Q</p>)}
-                                                    { index === 1 && (<p>W</p>)}
-                                                    { index === 2 && (<p>E</p>)}
-                                                    { index === 3 && (<p>R</p>)}
-                                                    { index === 4 && (<p>T</p>)}
-                                                </div>
-                                                <div className="action-icon">
-                                                    { actionIconsMap[action.type] }
-                                                </div>
-                                                <div className="action-title">
-                                                    <h1>{action.title}</h1>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </>
-                                )}
-                            </div>
-                            <div className="actions-progress-container">
-                                {currentActions.length > 0 && currentActions.map(action => (
-                                    <div key={action.actionId} className="action-progress">
-                                        <div className="action-icon">
-                                            { actionIconsMap[action.actionType] }
-                                        </div>
-                                        <span className="action-percentage">{Math.round(action.progress * 100)}%</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="bottom-ui-panel center-panel" onContextMenu={(e) => { e.stopPropagation() }}>
-                            {/* Selection Viewport */}
-                            <div className="selection-container selection-viewport-container">
-                                <div 
-                                    className="selection-viewport"
-                                    onPointerEnter={() => (mainControlsRef.current.enabled = false)}
-                                    onPointerLeave={() => (mainControlsRef.current.enabled = true)}
-                                >
-                                    {/* Viewport R3F/Three Canvas */}
-                                    <Canvas>
-                                        {/* unit preview mesh */}
-                                        { selected && (
-                                            <>
-                                                <ViewportCamera targetRef={previewRef} selected={selected}/>
-
-                                                {/* lights */}
-                                                <ambientLight intensity={1} />
-                                                <directionalLight position={[5, 5, 5]} />
-                                                <ModelMapper previewRef={previewRef} model={selected.model} />
-                                            </>
-                                        )}
-                                    </Canvas>
-                                </div>
-                            </div>
-                            {/* Selection Data */}
-                            <div className="selection-container selection-data-container">
-                                { selected && (
-                                    <>
-                                        <h1 className="selected-text">{ selected.name }</h1>
-                                        {selected.integrity && selected.material && (
-                                            <>
-                                                <h2 className="selected-text-property">Integrity: { selected.integrity }</h2>
-                                                <h2 className="selected-text-property">Material: { selected.material[0].toUpperCase() + selected.material.slice(1) }</h2>
-                                            </>
-                                        )}
-                                        {selected.yield && (
-                                            <>
-                                                <h2 className="selected-text-property">Yield: { selected.yield }</h2>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                        <div className="bottom-ui-panel right-panel" onContextMenu={(e) => { e.stopPropagation() }}>
-                            <div className="right-panel-communications right-panel-side">
-                                <div className="communications-tabs">
-                                    {/* Logs */}
-                                    <div className={`comms-tab ${ commsTabs.logs === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: true, console: false, signals: false }) } }>
-                                        <h1>Logs</h1>
-                                    </div>
-                                    {/* Console: used to issue commands (same name as actions). Eventually allowing to chain commands and "hack"(in-game ability) from console */}
-                                    <div className={`comms-tab ${ commsTabs.console === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: false, console: true, signals: false }) } }>
-                                        <h1>Console</h1>
-                                    </div>
-                                    {/* Signals: used to communicate with other players or the board. Example: Distress Signal. Decoy Signal. Request Support Signal. Commands can ALSO use signal names */}
-                                    {/* Signals are used in replacement of Chat. Chat is used in the Games page (Lobby) */}
-                                    <div className={`comms-tab ${ commsTabs.signals === true ? 'comms-tab-selected' : '' }`} onClick={ ()=>{ setCommsTabs({ logs: false, console: false, signals: true }) } }>
-                                        <h1>Signals</h1>
-                                    </div>
-                                </div>
-                                <div className="communications-main">
-                                    { commsTabs.logs && logs && logs.map(log => (
-                                        <div className="communications-main-entry"><p>{log}</p></div>
-                                    ))}
-                                </div>
-                                <div className="communications-prompt">
-                                    <input className="communications-prompt-input" spellCheck={false} value={commsInput} onChange={(e) => { setCommsInput(e.target.value) }} ></input>
-                                    <button className="communications-prompt-enter-button">Enter</button>
-                                </div>
-                            </div>
-                            <div className="right-panel-electricity-graph right-panel-side">
-                                <div className="electricity-graph-title">
-                                    <h1>Electricity Graph</h1>
-                                </div>
-                                <div className="electricity-graph">
-                                    <ElectricityGraph data={graphData} />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Html>
+                <BottomUIBar
+                    mainControlsRef={mainControlsRef}
+                    selected={selected}
+                    previewRef={previewRef}
+                    currentActions={currentActions}
+                    commsTabs={commsTabs}
+                    setCommsTabs={setCommsTabs}
+                    logs={logs}
+                    commsInput={commsInput}
+                    setCommsInput={setCommsInput}
+                    actionIconsMap={actionIconsMap}
+                    startAction={startAction}
+                    graphData={graphData}
+                    commsMainRef={commsMainRef}
+                />
             </Canvas>
         </div>
     );

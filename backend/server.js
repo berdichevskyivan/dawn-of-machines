@@ -28,10 +28,12 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
 const actionsMap = {
     'assemble-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
     'assemble-builder-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+    'assemble-scanner-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 20 }, { resource: 'iron', amount: 20 }] },
     'assemble-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }, { resource: 'graphene', amount: 20 }] },
     'assemble-hacker-node': { duration: 12000, cost: [{ resource: 'electricity', amount: 70 }, { resource: 'steel', amount: 30 }, { resource: 'graphene', amount: 20 }] },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
     'build': { duration: 10000, cost: [{ resource: 'electricity', amount: 30 }] },
+    'scan': { duration: 5000, cost: [{ resource: 'electricity', amount: 20 }] },
     'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] },
     'attack': { duration: 1000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
@@ -116,7 +118,7 @@ const drainElectricity = (gameId) => {
             }
 
             // check in the array of actions for actions belonging to THIS player
-            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.5;
+            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.4;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(player.socketId);
@@ -155,6 +157,7 @@ const resolveActions = (gameId) => {
         let progress = null;
         let player = null;
         let playerSocket = null;
+        let unit = null;
         game.actions.forEach(action => {
             switch(action.type){
                 case 'electricity-threshold-alert':
@@ -173,7 +176,7 @@ const resolveActions = (gameId) => {
                     if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
                     break;
                 case 'movement':
-                    const unit = game.units.get(action.unitId);
+                    unit = game.units.get(action.unitId);
                     if(!unit) break;
 
                     progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
@@ -194,15 +197,10 @@ const resolveActions = (gameId) => {
                     player = game.players.find(p => p.socketId === unit.player);
 
                     if(player){
-                        for (const tileId of unit.sight) {
-                            const index = player.sight.indexOf(tileId);
-                            if (index !== -1) {
-                                player.sight.splice(index, 1);
-                            }
-                        }
-
-                        // This works 
-                        unit.sight = [...calculateSight(Math.round(unit.x), Math.round(unit.z)), ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))];
+                        unit.sight = [...new Set([
+                            ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                            ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
+                        ])];
 
                         const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
                         const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
@@ -287,6 +285,7 @@ const resolveActions = (gameId) => {
                             actions: [
                                 { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
                                 { type: 'build', title: 'Build', duration: actionsMap['build'] },
+                                { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
                                 { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
                                 { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
                             ], // to do, a template for this since all nodes have the same action map
@@ -312,6 +311,48 @@ const resolveActions = (gameId) => {
                     if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
 
                     break;
+                    case 'gather':
+                        unit = game.units.get(action.unitId);
+                        if (!unit) break;
+
+                        player = game.players.find(p => p.socketId === unit.player);
+                        playerSocket = sockets.get(player.socketId);
+
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                        // Deduct costs progressively
+                        action.costPaid.forEach(cost => {
+                            const targetPaid = cost.amount * progress;
+                            const delta = targetPaid - cost.amountPaid;
+                            if (delta > 0) {
+                                if (player.resources[cost.resource] >= delta) {
+                                    player.resources[cost.resource] -= delta;
+                                    cost.amountPaid += delta;
+                                } else {
+                                    action.paused = true;
+                                }
+                            }
+                        });
+
+                        // Apply gathering progressively
+                        const tickProgress = progress - (action.lastProgress || 0);
+                        action.lastProgress = progress;
+
+                        unit.sight.forEach(tileId => {
+                            const tile = game.board.find(t => t.id === tileId);
+                            if (tile && tile.resource) {
+                                const resource = game.resources.find(r => r.id === tile.resource);
+                                if (resource && resource.yield > 0) {
+                                    const amount = Math.min(tickProgress * 1, resource.yield);
+                                    resource.yield -= amount;
+                                    player.resources[resource.resource] = (player.resources[resource.resource] || 0) + amount;
+                                }
+                            }
+                        });
+
+                        if (playerSocket) playerSocket.emit('player-update', { playerData: player });
+                        io.to(game.room).emit('resources-update', game.resources);
+                        break;
             }
         });
 
@@ -397,6 +438,7 @@ io.on('connection', (socket) => {
                 {
                     id: randomUUID(),
                     name: 'Iron Deposit',
+                    resource: 'iron',
                     model: 'iron-deposit',
                     x: 6,
                     z: 7,
@@ -406,6 +448,7 @@ io.on('connection', (socket) => {
                 {
                     id: randomUUID(),
                     name: 'Carbon Deposit',
+                    resource: 'carbon',
                     model: 'carbon-deposit',
                     x: 8,
                     z: 9,
@@ -439,6 +482,7 @@ io.on('connection', (socket) => {
             actions: [
                 { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
                 { type: 'build', title: 'Build', duration: actionsMap['build'] },
+                { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
                 { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
                 { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
             ],
@@ -465,8 +509,9 @@ io.on('connection', (socket) => {
                 actions: [
                     { type: 'assemble-gather-node', title: 'Assemble Gather Node', duration: actionsMap['assemble-gather-node'] },
                     { type: 'assemble-builder-node', title: 'Assemble Builder Node', duration: actionsMap['assemble-builder-node'] },
+                    { type: 'assemble-scanner-node', title: 'Assemble Scanner Node', duration: actionsMap['assemble-scanner-node'] },
+                    { type: 'assemble-hacker-node', title: 'Assemble Hacker Node', duration: actionsMap['assemble-hacker-node'] },
                     { type: 'assemble-combat-node', title: 'Assemble Combat Node', duration: actionsMap['assemble-combat-node'] },
-                    { type: 'assemble-hacker-node', title: 'Assemble Hacker Node', duration: actionsMap['assemble-hacker-node'] }
                 ],
             },
             {

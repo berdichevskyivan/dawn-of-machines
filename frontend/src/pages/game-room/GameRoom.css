@@ -88,6 +88,14 @@
 
 .communications-main {
     height: 70%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.communications-main::-webkit-scrollbar {
+    display: none;
 }
 
 .communications-main-entry {
