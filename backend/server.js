@@ -134,7 +134,7 @@ const generateElectricity = (gameId) => {
                 .map(id => game.buildings.get(id))
                 .filter(b => b && b.player === player.socketId);  // keep only this player's generators
 
-            player.resources.electricity += playerGenerators.length * 0.15;
+            player.resources.electricity += playerGenerators.length * 0.20;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(player.socketId);
@@ -205,9 +205,15 @@ const resolveActions = (gameId) => {
                         const playerBuildingIds = game.buildingsByPlayer.get(player.socketId) || new Set();
                         const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
 
+                        const unitSightIds = [
+                            ...unit.sight,
+                            unit.position,
+                            previousPosition,
+                        ];
+
                         player.sight = [
                             ...playerUnits.flatMap(u => u.sight),
-                            ...unit.sight,
+                            ...unitSightIds,
                             ...playerBuildings.flatMap(b => b.sight),
                         ];
 
