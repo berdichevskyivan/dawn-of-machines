@@ -26,10 +26,14 @@ const boardTemplate = Array.from({length: 100}, (_, i) => ({
                                 }))
 
 const actionsMap = {
-    'build-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
-    'build-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }] },
+    'assemble-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+    'assemble-builder-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+    'assemble-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }, { resource: 'graphene', amount: 20 }] },
+    'assemble-hacker-node': { duration: 12000, cost: [{ resource: 'electricity', amount: 70 }, { resource: 'steel', amount: 30 }, { resource: 'graphene', amount: 20 }] },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
-    'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] }, // when duration is reached. Hack is completed.
+    'build': { duration: 10000, cost: [{ resource: 'electricity', amount: 30 }] },
+    'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] },
+    'attack': { duration: 1000, cost: [{ resource: 'electricity', amount: 10 }] },
 }
 
 const oppositeRound = x => Math.round(x) + (Math.round(x) > x ? -1 : (Math.round(x) < x ? 1 : 0));
@@ -228,7 +232,7 @@ const resolveActions = (gameId) => {
 
                     io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
                     break;
-                case 'build-gather-node':
+                case 'assemble-gather-node':
                     const building = game.buildings.get(action.buildingId);
                     if(!building) break;
 
@@ -280,7 +284,12 @@ const resolveActions = (gameId) => {
                             speed: 3,
                             integrity: 100,
                             material: 'iron',
-                            actions: [{ type: 'gather', title: 'Gather', duration: actionsMap['gather'] }],
+                            actions: [
+                                { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
+                                { type: 'build', title: 'Build', duration: actionsMap['build'] },
+                                { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
+                                { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
+                            ], // to do, a template for this since all nodes have the same action map
                         }
 
                         // set in units Map
@@ -429,7 +438,9 @@ io.on('connection', (socket) => {
             material: 'iron',
             actions: [
                 { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
+                { type: 'build', title: 'Build', duration: actionsMap['build'] },
                 { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
+                { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
             ],
         };
 
@@ -452,8 +463,10 @@ io.on('connection', (socket) => {
                 integrity: 100,
                 material: 'iron',
                 actions: [
-                    { type: 'build-gather-node', title: 'Build Gather Node', duration: actionsMap['build-gather-node'] },
-                    { type: 'build-combat-node', title: 'Build Combat Node', duration: actionsMap['build-combat-node'] }
+                    { type: 'assemble-gather-node', title: 'Assemble Gather Node', duration: actionsMap['assemble-gather-node'] },
+                    { type: 'assemble-builder-node', title: 'Assemble Builder Node', duration: actionsMap['assemble-builder-node'] },
+                    { type: 'assemble-combat-node', title: 'Assemble Combat Node', duration: actionsMap['assemble-combat-node'] },
+                    { type: 'assemble-hacker-node', title: 'Assemble Hacker Node', duration: actionsMap['assemble-hacker-node'] }
                 ],
             },
             {
@@ -471,7 +484,26 @@ io.on('connection', (socket) => {
                 integrity: 100,
                 material: 'iron',
                 actions: [],
-            }
+            },
+            {
+                id: randomUUID(),
+                hackId: randomUUID(),
+                mobile: false,
+                name: 'Refinery',
+                model: 'refinery',
+                type: 'refinery',
+                player: socket.id,
+                sight: [],
+                x: 3,
+                z: 3,
+                position: null,
+                integrity: 100,
+                material: 'iron',
+                actions: [
+                    { type: 'refine-iron', title: 'Refine Iron', duration: actionsMap['refine-iron'] },
+                    { type: 'refine-carbon', title: 'Refine Carbon', duration: actionsMap['refine-carbon'] },
+                ],
+            },
         ];
 
         starterBuildings.forEach(sb => game.buildings.set(sb.id, sb));
@@ -760,6 +792,17 @@ io.on('connection', (socket) => {
 
             if(data.selected.mobile === true){
                 const unit = game.units.get(data.selected.id);
+                if(unit){
+                    game.actions.push({
+                        id: randomUUID(),
+                        type: data.actionType,
+                        unitId: unit.id,
+                        startingTime: Date.now(),
+                        duration: actionsMap[data.actionType].duration,
+                        costPaid: actionCost.map(cost => ({...cost, amountPain:0})),
+                        paused: false,
+                    });
+                }
             } else {
                 const building = game.buildings.get(data.selected.id);
 

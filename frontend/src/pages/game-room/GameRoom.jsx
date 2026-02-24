@@ -11,12 +11,18 @@ const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
     <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} fill="none" />
   </svg>
 );
-
+// TODO: Assign each action its own icon
 const actionIconsMap = {
-    'build-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'build-combat-node': <GatherNodeIcon color="#00FF00" size={50} />, // For now we use the same Icon
+    'assemble-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'assemble-builder-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'assemble-combat-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'assemble-hacker-node': <GatherNodeIcon color="#00FF00" size={50} />,
+    'refine-iron': <GatherNodeIcon color="#00FF00" size={50} />,
+    'refine-carbon': <GatherNodeIcon color="#00FF00" size={50} />,
     'gather': <GatherNodeIcon color="#00FF00" size={50} />,
+    'build': <GatherNodeIcon color="#00FF00" size={50} />,
     'hack': <GatherNodeIcon color="#00FF00" size={50} />,
+    'attack': <GatherNodeIcon color="#00FF00" size={50} />,
 }
 
 function ModelMapper({model, previewRef}){
