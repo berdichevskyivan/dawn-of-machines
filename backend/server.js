@@ -799,7 +799,7 @@ io.on('connection', (socket) => {
                         unitId: unit.id,
                         startingTime: Date.now(),
                         duration: actionsMap[data.actionType].duration,
-                        costPaid: actionCost.map(cost => ({...cost, amountPain:0})),
+                        costPaid: actionCost.map(cost => ({...cost, amountPaid:0})),
                         paused: false,
                     });
                 }
