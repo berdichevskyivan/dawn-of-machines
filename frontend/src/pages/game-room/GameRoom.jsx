@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import BottomUIBar from '../../components/ui/bottom-ui-bar/BottomUIBar';
 import * as THREE from 'three';
 
@@ -28,74 +28,6 @@ const actionIconsMap = {
     'attack': <GatherNodeIcon color="#00FF00" size={50} />,
 }
 
-function ModelMapper({model, previewRef}){
-    switch(model){
-        case 'gather-node':
-            return (
-                <mesh ref={previewRef}>
-                    <sphereGeometry args={[0.5]} />
-                    <meshStandardMaterial color="yellow" />
-                </mesh>
-            );
-        case 'assembly-plant':
-            return (
-                <mesh ref={previewRef}>
-                    <coneGeometry args={[0.5, 1, 4]} />
-                    <meshStandardMaterial color="yellow" />
-                </mesh>
-            );
-        case 'generator':
-            return (
-                <mesh ref={previewRef}>
-                    <coneGeometry args={[0.5, 1, 4]} />
-                    <meshStandardMaterial color="yellow" />
-                </mesh>
-            )
-        case 'iron-deposit':
-            return (
-                <mesh ref={previewRef}>
-                    <boxGeometry args={[1, 1, 1]} />
-                    <meshStandardMaterial color="yellow" />
-                </mesh>
-            )
-        case 'carbon-deposit':
-            return (
-                <mesh ref={previewRef}>
-                    <boxGeometry args={[1, 1, 1]} />
-                    <meshStandardMaterial color="yellow" />
-                </mesh>
-            )
-        default:
-            return (<></>)
-    }
-}
-
-const ElectricityGraph = ({ data }) => {
-    const width = 300;
-    const height = 100;
-    const maxTime = data[data.length - 1]?.time || 1;
-    const minTime = data[0]?.time || 0;
-    const timeRange = maxTime - minTime || 1;
-
-    const points = data.map(d => ({
-        x: ((d.time - minTime) / timeRange) * width,
-        y: height - (d.value / 100) * height,
-    }));
-
-    const d = points.reduce((acc, point, i) => {
-        if (i === 0) return `M ${point.x},${point.y}`;
-        const prev = points[i - 1];
-        const cpx = (prev.x + point.x) / 2;
-        return `${acc} C ${cpx},${prev.y} ${cpx},${point.y} ${point.x},${point.y}`;
-    }, '');
-
-    return (
-        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-            <path d={d} fill="none" stroke="rgb(0,255,0)" strokeWidth={1.5} />
-        </svg>
-    )
-}
-
 function Camera({mainControlsRef}) {
   const { camera } = useThree();
 
@@ -111,59 +43,10 @@ function Camera({mainControlsRef}) {
   return <OrbitControls ref={mainControlsRef} camera={camera} />;
 }
 
-function ViewportCamera({ targetRef, selected }) {
-  const { camera, size } = useThree();
-  const controlsRef = useRef();
-
-  useEffect(() => {
-    if (!targetRef.current) return;
-
-    // Compute bounds
-    const box = new THREE.Box3().setFromObject(targetRef.current);
-    const sizeVec = new THREE.Vector3();
-    const center = new THREE.Vector3();
-
-    box.getSize(sizeVec);
-    box.getCenter(center);
-
-    if(selected.model !== 'gather-node' && selected.model !== 'iron-deposit' && selected.model !== 'carbon-deposit'){
-        // nudge the center slightly
-        center.y += sizeVec.y * -0.10;
-    }
-
-    // Fit distance based on FOV
-    const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
-    const fov = camera.fov * (Math.PI / 180);
-    let distance = maxDim / (2 * Math.tan(fov / 2));
-
-    distance *= 3; // padding factor
-
-    camera.position.copy(center.clone().add(new THREE.Vector3(0, 0, distance)));
-    camera.near = distance / 100;
-    camera.far = distance * 100;
-    camera.updateProjectionMatrix();
-
-    if (controlsRef.current) {
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    }
-  }, [selected]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      camera={camera}
-      enablePan
-      enableZoom
-    />
-  );
-}
-
 function Tile({position, tile, moveToTile}){
 
     const tileRef = useRef();
 
-    // Not used yet
     // useFrame((state, delta) => {
     //     tileRef.current.scale.x += 0.01;
     // })
