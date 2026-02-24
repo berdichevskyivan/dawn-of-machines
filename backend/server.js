@@ -354,17 +354,15 @@ io.on('connection', (socket) => {
         // we received a 'game-start' event from THIS socket(this is relevant, we must know WHICH socket initiated this, that's our Player 1)
         // here, we create a game, right now, straight up, in the future we automatically check for credentials, etc
 
-        // For now, the socket that called game-start joins the room, the room is called based on the length of the games, that's it.
-        const gameRoomName = `game-room-${(games.length+1).toString()}`;
+        const gameRoomName = `game-room-${(games.size+1).toString()}`;
 
-        // later we verify if this gameRoomName already exist by iterating over games
+        // TODO: Very if room already exists
         socket.join(gameRoomName);
-
-        // remember to later call socket.leave(gameRoomName) or socket.leave(game.room)
+        // TODO: Call socket.leave(room);
 
         let game = {
             id: randomUUID(),
-            title: `Game ${(games.length+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
+            title: `Game ${(games.size+1).toString()}`, // auto-generated, look at "games", get length, plus 1, that's it
             room: gameRoomName,
             startingTime: Date.now(), // Time. Each object or process has its own startingTime
             startingSocketId: socket.id,
