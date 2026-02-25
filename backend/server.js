@@ -161,17 +161,17 @@ const resolveActions = (gameId) => {
         game.actions.forEach(action => {
             switch(action.type){
                 case 'electricity-threshold-alert':
-                    player = game.players.find(p => p.socketId === action.playerId);
+                    player = game.players.get(action.playerId);
                     playerSocket = sockets.get(player.socketId);
                     if(playerSocket) playerSocket.emit('logs-update', { log: '[ALERT] Electricity dropped below 50.' });
                     break;
                 case 'electricity-threshold-critical':
-                    player = game.players.find(p => p.socketId === action.playerId);
+                    player = game.players.get(action.playerId);
                     playerSocket = sockets.get(player.socketId);
                     if(playerSocket) playerSocket.emit('logs-update', { log: '[CRITICAL] Electricity dropped below 25.' });
                     break;
                 case 'electricity-threshold-fatal':
-                    player = game.players.find(p => p.socketId === action.playerId);
+                    player = game.players.get(action.playerId);
                     playerSocket = sockets.get(player.socketId);
                     if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
                     break;
@@ -194,7 +194,7 @@ const resolveActions = (gameId) => {
                         if(newPositionTile) newPositionTile.unit = unit.id;
                     }
 
-                    player = game.players.find(p => p.socketId === unit.player);
+                    player = game.players.get(unit.player);
 
                     if(player){
                         unit.sight = [...new Set([
@@ -234,7 +234,7 @@ const resolveActions = (gameId) => {
                     const building = game.buildings.get(action.buildingId);
                     if(!building) break;
 
-                    player = game.players.find(p => p.socketId === building.player);
+                    player = game.players.get(building.player);
                     playerSocket = sockets.get(player.socketId);
 
                     if(action.paused) {
@@ -315,7 +315,7 @@ const resolveActions = (gameId) => {
                         unit = game.units.get(action.unitId);
                         if (!unit) break;
 
-                        player = game.players.find(p => p.socketId === unit.player);
+                        player = game.players.get(unit.player);
                         playerSocket = sockets.get(player.socketId);
 
                         progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
@@ -420,8 +420,8 @@ io.on('connection', (socket) => {
             startingTime: Date.now(), // Time. Each object or process has its own startingTime
             startingSocketId: socket.id,
             actions: [], // all actions in the game occur here. The main interval checks it every 50ms
-            players: [
-                {
+            players: new Map([
+                [socket.id, {
                     name: 'Player 1',
                     socketId: socket.id,
                     startedGame: true,
@@ -432,10 +432,10 @@ io.on('connection', (socket) => {
                         graphene: 0,
                         electricity: 100
                     },
-                    sight: [], // this lives at the player level. Player total sight is determined and enforced by the server, not the client.
-                    discovered: [], // player may or may not have sight on these tiles, but they are visible already. Still, sight has its own logic (some things depend SOLELY on sight, NOT discovery)
-                }
-            ],
+                    sight: [],
+                    discovered: [],
+                }]
+            ]),
             board: new Map(boardTemplate),
             resources: [
                 {
@@ -580,8 +580,9 @@ io.on('connection', (socket) => {
             const calculatedSight = calculateSight(u.x, u.z);
             const calculatedPosition = calculatePosition(u.x, u.z);
 
-            game.players[0].sight.push(...calculatedSight);
-            game.players[0].discovered.push(...calculatedSight);
+            const player = game.players.get(socket.id);
+            player.sight.push(...calculatedSight);
+            player.discovered.push(...calculatedSight);
 
             const tile = game.board.get(calculatedPosition);
             if(tile) tile.unit = u.id;
@@ -598,8 +599,9 @@ io.on('connection', (socket) => {
             const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
 
-            game.players[0].sight.push(...calculatedSight);
-            game.players[0].discovered.push(...calculatedSight);
+            const player = game.players.get(socket.id);
+            player.sight.push(...calculatedSight);
+            player.discovered.push(...calculatedSight);
 
             const tile = game.board.get(calculatedPosition);
             if(tile) tile.building = b.id;
@@ -645,6 +647,7 @@ io.on('connection', (socket) => {
             units: Array.from(game.units.values()),
             buildings: Array.from(game.buildings.values()),
             board: Array.from(game.board.values()),
+            players: Array.from(game.players.values()),
         };
         delete safeGameData.id;
 
@@ -655,7 +658,7 @@ io.on('connection', (socket) => {
         const game = gamesByRoom.get(gameRoom);
         if (!game) return
 
-        const player = game.players.find(p => p.socketId === originalSocketId)
+        const player = game.players.get(originalSocketId);
 
         if (player) {
             // Update player socket
@@ -716,6 +719,7 @@ io.on('connection', (socket) => {
                 units: Array.from(game.units.values()),
                 buildings: Array.from(game.buildings.values()),
                 board: Array.from(game.board.values()),
+                players: Array.from(game.players.values()),
             };
 
             socket.emit('starting-game-data', safeGameData);
@@ -803,7 +807,7 @@ io.on('connection', (socket) => {
         if(game){
 
             // Check if player has the resources to cost that action
-            const player = game.players.find(p => p.socketId === socket.id);
+            const player = game.players.get(socket.id);
             const actionCost = actionsMap[data.actionType].cost;
 
             // Iterate over the cost (it can be more than one resource)
