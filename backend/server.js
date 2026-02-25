@@ -16,14 +16,14 @@ let gamesByRoom = new Map();
 let gamesByStarted = new Map();
 let intervals = new Map();
 let sockets = new Map();
-const boardTemplate = Array.from({length: 100}, (_, i) => ({ 
-                                    id: i,
-                                    x: i % 10,
-                                    z: Math.floor(i / 10),
-                                    resource: null,
-                                    unit: null,
-                                    building: null,
-                                }))
+const boardTemplate = new Map(Array.from({length: 100}, (_, i) => [i, { 
+    id: i,
+    x: i % 10,
+    z: Math.floor(i / 10),
+    resource: null,
+    unit: null,
+    building: null,
+}]));
 
 const actionsMap = {
     'assemble-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
@@ -62,8 +62,7 @@ const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
         // skip tiles that are outside the board
         if (nx < 0 || nx >= boardWidth || nz < 0 || nz >= boardHeight) continue;
 
-        // O(1) lookup
-        sightTileIds.push(boardTemplate[nz * boardWidth + nx].id);
+        sightTileIds.push(nz * boardWidth + nx);
     }
 
     return sightTileIds;
@@ -71,7 +70,7 @@ const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
 
 const calculatePosition = (x, z, boardWidth = 10) => {
     if (x < 0 || x >= boardWidth || z < 0 || z >= boardWidth) return undefined;
-    return boardTemplate[z * boardWidth + x].id;
+    return z * boardWidth + x;
 }
 
 const drainElectricity = (gameId) => {
@@ -101,6 +100,7 @@ const drainElectricity = (gameId) => {
                         type: `electricity-threshold-${newThreshold}`,
                         startingTime: Date.now(),
                         duration: 1,
+                        drainsElectricity: false,
                     });
                 }
             }
@@ -118,7 +118,7 @@ const drainElectricity = (gameId) => {
             }
 
             // check in the array of actions for actions belonging to THIS player
-            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId).length * 0.4;
+            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId && action.drainsElectricity).length * 0.4;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(player.socketId);
@@ -188,9 +188,9 @@ const resolveActions = (gameId) => {
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
 
                     if(previousPosition !== unit.position){
-                        const previousPositionTile = game.board.find(tile => tile.id === previousPosition);
+                        const previousPositionTile = game.board.get(previousPosition);
                         if(previousPositionTile) previousPositionTile.unit = null;
-                        const newPositionTile = game.board.find(tile => tile.id === unit.position);
+                        const newPositionTile = game.board.get(unit.position);
                         if(newPositionTile) newPositionTile.unit = unit.id;
                     }
 
@@ -339,7 +339,7 @@ const resolveActions = (gameId) => {
                         action.lastProgress = progress;
 
                         unit.sight.forEach(tileId => {
-                            const tile = game.board.find(t => t.id === tileId);
+                            const tile = game.board.get(tileId);
                             if (tile && tile.resource) {
                                 const resource = game.resources.find(r => r.id === tile.resource);
                                 if (resource && resource.yield > 0) {
@@ -350,7 +350,10 @@ const resolveActions = (gameId) => {
                             }
                         });
 
-                        if (playerSocket) playerSocket.emit('player-update', { playerData: player });
+                        if (playerSocket){
+                            playerSocket.emit('player-update', { playerData: player });
+                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
+                        } 
                         io.to(game.room).emit('resources-update', game.resources);
                         break;
             }
@@ -433,7 +436,7 @@ io.on('connection', (socket) => {
                     discovered: [], // player may or may not have sight on these tiles, but they are visible already. Still, sight has its own logic (some things depend SOLELY on sight, NOT discovery)
                 }
             ],
-            board: [...boardTemplate],
+            board: new Map(boardTemplate),
             resources: [
                 {
                     id: randomUUID(),
@@ -573,7 +576,6 @@ io.on('connection', (socket) => {
             game.buildingsByType.get(sb.type).add(sb.id);
         });
 
-        // Now game.units is a Map()
         game.units.forEach((u, unitId) => {
             const calculatedSight = calculateSight(u.x, u.z);
             const calculatedPosition = calculatePosition(u.x, u.z);
@@ -581,15 +583,8 @@ io.on('connection', (socket) => {
             game.players[0].sight.push(...calculatedSight);
             game.players[0].discovered.push(...calculatedSight);
 
-            game.board = game.board.map(tile => {
-                if(tile.id === calculatedPosition){
-                    return {
-                        ...tile,
-                        unit: u.id,
-                    };
-                }
-                return {...tile};
-            });
+            const tile = game.board.get(calculatedPosition);
+            if(tile) tile.unit = u.id;
 
             // update the unit object in the Map in-place
             u.sight = calculatedSight;
@@ -599,7 +594,6 @@ io.on('connection', (socket) => {
             game.units.set(unitId, u);
         });
 
-        // Now game.buildings is a Map()
         game.buildings.forEach((b, buildingId) => {
             const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
@@ -607,12 +601,8 @@ io.on('connection', (socket) => {
             game.players[0].sight.push(...calculatedSight);
             game.players[0].discovered.push(...calculatedSight);
 
-            game.board = game.board.map(tile => {
-                if(tile.id === calculatedPosition){
-                    return { ...tile, building: b.id };
-                }
-                return { ...tile };
-            });
+            const tile = game.board.get(calculatedPosition);
+            if(tile) tile.building = b.id;
 
             // update the building object in the Map in-place
             b.sight = calculatedSight;
@@ -624,16 +614,8 @@ io.on('connection', (socket) => {
         game.resources = game.resources.map(r => {
             const calculatedPosition = calculatePosition(r.x, r.z);
 
-            game.board = game.board.map(tile => {
-                if(tile.id === calculatedPosition){
-                    return {
-                        ...tile,
-                        resource: r.id,
-                    }
-                }
-
-                return {...tile}
-            })
+            const tile = game.board.get(calculatedPosition);
+            if(tile) tile.resource = r.id;
 
             return {
                 ...r,
@@ -662,6 +644,7 @@ io.on('connection', (socket) => {
             ...game,
             units: Array.from(game.units.values()),
             buildings: Array.from(game.buildings.values()),
+            board: Array.from(game.board.values()),
         };
         delete safeGameData.id;
 
@@ -732,6 +715,7 @@ io.on('connection', (socket) => {
                 ...game,
                 units: Array.from(game.units.values()),
                 buildings: Array.from(game.buildings.values()),
+                board: Array.from(game.board.values()),
             };
 
             socket.emit('starting-game-data', safeGameData);
@@ -776,10 +760,10 @@ io.on('connection', (socket) => {
                 // if unit is already moving, remove any type: 'movement' actions from array
                 game.actions = game.actions.filter(action => !(action.type === 'movement' && action.unitId === data.unitId));
 
-                const startTile = boardTemplate.find(t => t.id === unit.position);
-                const endTile = boardTemplate.find(t => t.id === data.tileId);
+                const startTile = boardTemplate.get(unit.position);
+                const endTile = boardTemplate.get(data.tileId);
 
-                const gameBoardEndTile = game.board.find(tile => tile.id === endTile.id);
+                const gameBoardEndTile = game.board.get(endTile.id);
 
                 // We have the endTile. If the endTile is occupied, we forbid movement.
                 if(gameBoardEndTile && (gameBoardEndTile.resource || gameBoardEndTile.building || gameBoardEndTile.unit)){
@@ -805,6 +789,7 @@ io.on('connection', (socket) => {
                     startZ: startTile.z,
                     destinationX: endTile.x,
                     destinationZ: endTile.z,
+                    drainsElectricity: true,
                 })
             }
         }
@@ -846,6 +831,7 @@ io.on('connection', (socket) => {
                         duration: actionsMap[data.actionType].duration,
                         costPaid: actionCost.map(cost => ({...cost, amountPaid:0})),
                         paused: false,
+                        drainsElectricity: true,
                     });
                 }
             } else {
@@ -860,6 +846,7 @@ io.on('connection', (socket) => {
                         duration: actionsMap[data.actionType].duration, // later you may add modifiers here or in resolveActions
                         costPaid: actionCost.map(cost => ({ ...cost, amountPaid: 0 })),
                         paused: false,
+                        drainsElectricity: true,
                     });
                 }
 

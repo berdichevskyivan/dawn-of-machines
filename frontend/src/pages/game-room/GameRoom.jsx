@@ -427,10 +427,9 @@ function GameRoom({socket}){
         commsMainRef.current.scrollTop = commsMainRef.current.scrollHeight;
     }, [logs]);
 
-    // think of this as a diagonal cutting from center of the first tile
-    // towards the center of the last tile
-    const maxX = Math.max(...board.map(t => t.x));
-    const maxZ = Math.max(...board.map(t => t.z));
+    // max X and max Z are always 9 in a 10 x 10 board
+    const maxX = 9;
+    const maxZ = 9;
     const offsetX = maxX / 2;
     const offsetZ = maxZ / 2;
 
