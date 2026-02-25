@@ -31,6 +31,8 @@ const actionsMap = {
     'assemble-scanner-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 20 }, { resource: 'iron', amount: 20 }] },
     'assemble-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }, { resource: 'graphene', amount: 20 }] },
     'assemble-hacker-node': { duration: 12000, cost: [{ resource: 'electricity', amount: 70 }, { resource: 'steel', amount: 30 }, { resource: 'graphene', amount: 20 }] },
+    'refine-iron': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'iron', amount: 10 }, { resource: 'carbon', amount: 10 }], yield: { resource: 'steel', amount: 10 } },
+    'refine-carbon': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'carbon', amount: 30 }], yield: { resource: 'graphene', amount: 10 } },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
     'build': { duration: 10000, cost: [{ resource: 'electricity', amount: 30 }] },
     'scan': { duration: 5000, cost: [{ resource: 'electricity', amount: 20 }] },
@@ -140,12 +142,43 @@ const generateElectricity = (gameId) => {
                 .map(id => game.buildings.get(id))
                 .filter(b => b && b.player === player.socketId);  // keep only this player's generators
 
-            player.resources.electricity += playerGenerators.length * 0.20;
+            player.resources.electricity += playerGenerators.length * 0.4;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(player.socketId);
             if (playerSocket) playerSocket.emit('player-update', { playerData: player });
         })
+    }
+}
+
+const refineResource = (game, action) => {
+    const player = game.players.get(action.playerId);
+    const playerSocket = sockets.get(player.socketId);
+    
+    const progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+    action.costPaid.forEach(cost => {
+        const targetPaid = cost.amount * progress;
+        const delta = targetPaid - cost.amountPaid;
+        if(delta > 0){
+            if(player.resources[cost.resource] >= delta){
+                player.resources[cost.resource] -= delta;
+                cost.amountPaid += delta;
+            }else{
+                action.paused = true;
+            }
+        }
+    });
+
+    const tickProgress = progress - (action.lastProgress || 0);
+    action.lastProgress = progress;
+
+    const amount = Math.min(tickProgress * 1, actionsMap[action.type].yield.amount);
+    player.resources[actionsMap[action.type].yield.resource] = (player.resources[actionsMap[action.type].yield.resource] || 0) + amount;
+
+    if (playerSocket){
+        playerSocket.emit('player-update', { playerData: player });
+        playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
     }
 }
 
@@ -158,6 +191,7 @@ const resolveActions = (gameId) => {
         let player = null;
         let playerSocket = null;
         let unit = null;
+        let tickProgress = null;
         game.actions.forEach(action => {
             switch(action.type){
                 case 'electricity-threshold-alert':
@@ -239,6 +273,7 @@ const resolveActions = (gameId) => {
 
                     if(action.paused) {
                         // Try to unpause if resources are back
+                        // TODO: Some actions get stuck when paused. Check this.
                         const canResume = action.costPaid.every(cost => {
                             const targetPaid = cost.amount * ((Date.now() - action.startingTime) / action.duration);
                             return player.resources[cost.resource] >= (targetPaid - cost.amountPaid);
@@ -311,51 +346,58 @@ const resolveActions = (gameId) => {
                     if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
 
                     break;
-                    case 'gather':
-                        unit = game.units.get(action.unitId);
-                        if (!unit) break;
+                case 'refine-iron':
+                    refineResource(game, action);
+                    break;
+                case 'refine-carbon':
+                    refineResource(game, action);
+                    break;
+                case 'gather':
+                    unit = game.units.get(action.unitId);
+                    if (!unit) break;
 
-                        player = game.players.get(unit.player);
-                        playerSocket = sockets.get(player.socketId);
+                    player = game.players.get(unit.player);
+                    playerSocket = sockets.get(player.socketId);
 
-                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                        // Deduct costs progressively
-                        action.costPaid.forEach(cost => {
-                            const targetPaid = cost.amount * progress;
-                            const delta = targetPaid - cost.amountPaid;
-                            if (delta > 0) {
-                                if (player.resources[cost.resource] >= delta) {
-                                    player.resources[cost.resource] -= delta;
-                                    cost.amountPaid += delta;
-                                } else {
-                                    action.paused = true;
-                                }
+                    // Deduct costs progressively
+                    action.costPaid.forEach(cost => {
+                        const targetPaid = cost.amount * progress;
+                        const delta = targetPaid - cost.amountPaid;
+                        if (delta > 0) {
+                            if (player.resources[cost.resource] >= delta) {
+                                player.resources[cost.resource] -= delta;
+                                cost.amountPaid += delta;
+                            } else {
+                                action.paused = true;
                             }
-                        });
+                        }
+                    });
 
-                        // Apply gathering progressively
-                        const tickProgress = progress - (action.lastProgress || 0);
-                        action.lastProgress = progress;
+                    // Apply gathering progressively
+                    tickProgress = progress - (action.lastProgress || 0);
+                    action.lastProgress = progress;
 
-                        unit.sight.forEach(tileId => {
-                            const tile = game.board.get(tileId);
-                            if (tile && tile.resource) {
-                                const resource = game.resources.find(r => r.id === tile.resource);
-                                if (resource && resource.yield > 0) {
-                                    const amount = Math.min(tickProgress * 1, resource.yield);
-                                    resource.yield -= amount;
-                                    player.resources[resource.resource] = (player.resources[resource.resource] || 0) + amount;
-                                }
+                    unit.sight.forEach(tileId => {
+                        const tile = game.board.get(tileId);
+                        if (tile && tile.resource) {
+                            const resource = game.resources.find(r => r.id === tile.resource);
+                            if (resource && resource.yield > 0) {
+                                const modifier = 2; // later we can add other modifiers based on efficiency, for example.
+                                const amount = Math.min(tickProgress * modifier, resource.yield);
+                                resource.yield -= amount;
+                                player.resources[resource.resource] = (player.resources[resource.resource] || 0) + amount;
                             }
-                        });
+                        }
+                    });
 
-                        if (playerSocket){
-                            playerSocket.emit('player-update', { playerData: player });
-                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
-                        } 
-                        io.to(game.room).emit('resources-update', game.resources);
-                        break;
+                    if (playerSocket){
+                        playerSocket.emit('player-update', { playerData: player });
+                        playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
+                    } 
+                    io.to(game.room).emit('resources-update', game.resources);
+                    break;
             }
         });
 
@@ -836,6 +878,7 @@ io.on('connection', (socket) => {
                         costPaid: actionCost.map(cost => ({...cost, amountPaid:0})),
                         paused: false,
                         drainsElectricity: true,
+                        playerId: player.socketId,
                     });
                 }
             } else {
@@ -847,10 +890,11 @@ io.on('connection', (socket) => {
                         type: data.actionType,
                         buildingId: building.id,
                         startingTime: Date.now(),
-                        duration: actionsMap[data.actionType].duration, // later you may add modifiers here or in resolveActions
+                        duration: actionsMap[data.actionType].duration,
                         costPaid: actionCost.map(cost => ({ ...cost, amountPaid: 0 })),
                         paused: false,
                         drainsElectricity: true,
+                        playerId: player.socketId,
                     });
                 }
 

@@ -466,7 +466,7 @@ function GameRoom({socket}){
                             <div className="icon">
                                 <div className="steel-icon" />
                             </div>
-                            <h1>{resources.steel}</h1>
+                            <h1>{Number(resources.steel.toFixed(1))}</h1>
                         </div>
                         <div className="resource-field">
                             <div className="icon">
