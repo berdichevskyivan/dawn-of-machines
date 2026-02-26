@@ -714,7 +714,7 @@ function GameRoom({socket}){
                             <div className="icon">
                                 {grapheneIcon}
                             </div>
-                            <h1>{resources.graphene}</h1>
+                            <h1>{Number(resources.graphene.toFixed(1))}</h1>
                         </div>
                         <div className="resource-field">
                             <div className="icon">

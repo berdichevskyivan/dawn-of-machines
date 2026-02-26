@@ -100,6 +100,13 @@ function ModelMapper({model, previewRef}){
                     <meshStandardMaterial color="yellow" />
                 </mesh>
             )
+        case 'refinery':
+            return (
+                <mesh ref={previewRef}>
+                    <coneGeometry args={[0.5, 1, 4]} />
+                    <meshStandardMaterial color="yellow" />
+                </mesh>
+            )
         case 'iron-deposit':
             return (
                 <mesh ref={previewRef}>

@@ -552,11 +552,11 @@ io.on('connection', (socket) => {
                 integrity: 100,
                 material: 'iron',
                 actions: [
-                    { type: 'assemble-gather-node', title: 'Assemble Gather Node', duration: actionsMap['assemble-gather-node'] },
-                    { type: 'assemble-builder-node', title: 'Assemble Builder Node', duration: actionsMap['assemble-builder-node'] },
-                    { type: 'assemble-scanner-node', title: 'Assemble Scanner Node', duration: actionsMap['assemble-scanner-node'] },
-                    { type: 'assemble-hacker-node', title: 'Assemble Hacker Node', duration: actionsMap['assemble-hacker-node'] },
-                    { type: 'assemble-combat-node', title: 'Assemble Combat Node', duration: actionsMap['assemble-combat-node'] },
+                    { type: 'assemble-gather-node', title: 'Gather Node', duration: actionsMap['assemble-gather-node'] },
+                    { type: 'assemble-builder-node', title: 'Builder Node', duration: actionsMap['assemble-builder-node'] },
+                    { type: 'assemble-scanner-node', title: 'Scanner Node', duration: actionsMap['assemble-scanner-node'] },
+                    { type: 'assemble-hacker-node', title: 'Hacker Node', duration: actionsMap['assemble-hacker-node'] },
+                    { type: 'assemble-combat-node', title: 'Combat Node', duration: actionsMap['assemble-combat-node'] },
                 ],
             },
             {
