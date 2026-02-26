@@ -12,6 +12,98 @@ const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
     <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} fill="none" />
   </svg>
 );
+
+const GatherIcon = ({ color = 'limegreen', size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+    d="M12,12 m0,-1 a1,1 0 1,1 -2,0 a2,2 0 1,1 4,0 a3,3 0 1,1 -6,0 a4,4 0 1,1 8,0 a5,5 0 1,1 -10,0 a5,5 0 0,1 5.5,-5.5"
+    stroke={color}
+    strokeWidth="1.3"
+    fill="none"
+    strokeLinecap="round"
+    />
+  </svg>
+);
+
+const ScanIcon = ({ color = 'limegreen', size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Pupil */}
+    <circle cx="12" cy="12" r="3" fill={color} />
+    {/* Top arc */}
+    <path
+      d="M4,12 Q12,4 20,12"
+      stroke={color}
+      strokeWidth="1.3"
+      fill="none"
+      strokeLinecap="round"
+    />
+    {/* Bottom arc */}
+    <path
+      d="M4,12 Q12,20 20,12"
+      stroke={color}
+      strokeWidth="1.3"
+      fill="none"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const BuildIcon = ({ color = 'limegreen', size = 24 }) => (
+  <svg width={size} height={size} viewBox="2 2 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M10,19 Q11,21 15,21 Q17,21 18,19.5
+        
+        L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
+
+        M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
+
+        M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
+
+        M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
+
+        M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
+      stroke={color}
+      strokeWidth="1.2"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const AttackIcon = ({ color = 'limegreen', size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Concentric circles */}
+    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.2" fill="none" />
+    <circle cx="12" cy="12" r="7" stroke={color} strokeWidth="1.2" fill="none" />
+    <circle cx="12" cy="12" r="4" stroke={color} strokeWidth="1.2" fill="none" />
+    <circle cx="12" cy="12" r="1.5" fill={color} />
+
+    {/* Cross lines */}
+    <line x1="2" y1="12" x2="22" y2="12" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    <line x1="12" y1="2" x2="12" y2="22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+  </svg>
+);
+
+const HackIcon = ({ color = 'limegreen', size = 24 }) => (
+  <svg width={size} height={size} viewBox="2 2 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    {/* Hand */}
+    <path
+      d="M10,19 Q11,21 15,21 Q17,21 18,19.5
+        L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
+        M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
+        M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
+        M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
+        M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
+      stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"
+    />
+    {/* Eye in palm */}
+    <circle cx="14" cy="16" r="1.5" fill={color} />
+    <path d="M10,16 Q14,12 18,16" stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+    <path d="M10,16 Q14,20 18,16" stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+  </svg>
+);
+
 // TODO: Assign each action its own icon
 const actionIconsMap = {
     'assemble-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
@@ -21,11 +113,11 @@ const actionIconsMap = {
     'assemble-hacker-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-iron': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-carbon': <GatherNodeIcon color="#00FF00" size={50} />,
-    'gather': <GatherNodeIcon color="#00FF00" size={50} />,
-    'build': <GatherNodeIcon color="#00FF00" size={50} />,
-    'scan': <GatherNodeIcon color="#00FF00" size={50} />,
-    'hack': <GatherNodeIcon color="#00FF00" size={50} />,
-    'attack': <GatherNodeIcon color="#00FF00" size={50} />,
+    'gather': <GatherIcon color="limegreen" size={60} />,
+    'build': <BuildIcon color="#00FF00" size={60} />,
+    'scan': <ScanIcon color="#00FF00" size={60} />,
+    'hack': <HackIcon color="#00FF00" size={60} />,
+    'attack': <AttackIcon color="#00FF00" size={50} />,
 }
 
 function Camera({mainControlsRef}) {
