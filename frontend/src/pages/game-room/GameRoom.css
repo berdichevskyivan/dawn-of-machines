@@ -216,6 +216,7 @@
     margin-right: .5rem;
     cursor: pointer;
     position: relative;
+    border-radius: 4px;
 }
 
 .action-bound-key {
@@ -238,6 +239,10 @@
     justify-content: center;
     align-items: center;
     border-bottom: 3px solid rgb(0, 255, 0);
+
+    svg {
+        height: 100%;
+    }
 }
 
 .action-title {
@@ -274,6 +279,7 @@
     height: 85%;
     width: 85%;
     border: 2px solid rgb(0, 255, 0);
+    border-radius: 4px;
 }
 
 .selected-text, .selected-text-property {

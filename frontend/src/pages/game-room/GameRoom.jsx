@@ -7,117 +7,218 @@ import * as THREE from 'three';
 
 import './GameRoom.css';
 
-const GatherNodeIcon = ({ color = '#00FF00', size = 24 }) => (
+const colorByType = (type) => {
+    switch(type){
+        case "gather":
+            return "limegreen";
+        case "builder":
+        case "build":
+            return "gold";
+        case "scanner":
+        case "scan":
+            return "rgb(128,128,210)"
+        case "hacker":
+        case "hack":
+            return "cyan";
+        case "combat":
+        case "attack":
+            return "rgb(255,0,0)"
+    }
+}
+
+const gatherSymbol = (color) => <>
+                <path
+                d="M12,12 m0,-1 a1,1 0 1,1 -2,0 a2,2 0 1,1 4,0 a3,3 0 1,1 -6,0 a4,4 0 1,1 8,0 a5,5 0 1,1 -10,0 a5,5 0 0,1 5.5,-5.5"
+                stroke={color}
+                strokeWidth="1.3"
+                fill="none"
+                strokeLinecap="round"
+                />
+            </>
+
+const buildSymbol = (color) => <>
+                <path
+                    d="M10,19 Q11,21 15,21 Q17,21 18,19.5
+                        
+                        L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
+
+                        M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
+
+                        M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
+
+                        M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
+
+                        M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
+                    stroke={color}
+                    strokeWidth="1.2"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </>
+
+const scanSymbol = (color) => <>
+                {/* Pupil */}
+                <circle cx="12" cy="12" r="3" fill={color} />
+                {/* Top arc */}
+                <path
+                d="M4,12 Q12,4 20,12"
+                stroke={color}
+                strokeWidth="1.3"
+                fill="none"
+                strokeLinecap="round"
+                />
+                {/* Bottom arc */}
+                <path
+                d="M4,12 Q12,20 20,12"
+                stroke={color}
+                strokeWidth="1.3"
+                fill="none"
+                strokeLinecap="round"
+                />
+            </>
+
+const hackSymbol = (color) => <>
+                {/* Hand */}
+                <path
+                d="M10,19 Q11,21 15,21 Q17,21 18,19.5
+                    L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
+                    M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
+                    M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
+                    M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
+                    M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
+                stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"
+                />
+                {/* Eye in palm */}
+                <circle cx="14" cy="16" r="1.5" fill={color} />
+                <path d="M10,16 Q14,12 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
+                <path d="M10,16 Q14,20 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
+            </>
+
+const attackSymbol = (color) => <>
+                {/* Concentric circles */}
+                <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.2" fill="none" />
+                <circle cx="12" cy="12" r="7" stroke={color} strokeWidth="1.2" fill="none" />
+                <circle cx="12" cy="12" r="4" stroke={color} strokeWidth="1.2" fill="none" />
+                <circle cx="12" cy="12" r="1.5" fill={color} />
+
+                {/* Cross lines */}
+                <line x1="2" y1="12" x2="22" y2="12" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="12" y1="2" x2="12" y2="22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+            </>
+
+const symbolByType = (type) => {
+    switch(type){
+        case "gather":
+            return gatherSymbol(colorByType(type));
+        case "builder":
+        case "build":
+            return buildSymbol(colorByType(type));
+        case "scanner":
+        case "scan":
+            return scanSymbol(colorByType(type));
+        case "hacker":
+        case "hack":
+            return hackSymbol(colorByType(type));
+        case "combat":
+        case "attack":
+            return attackSymbol(colorByType(type));
+    }
+}
+
+const steelIcon = (<div className="steel-icon" />)
+
+const grapheneIcon = (
+    <svg className="graphene-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+        <g transform="scale(1.50) translate(-3, -3)">
+            {/* center */}
+            <polygon points="11.73,9 11.73,11 10,12 8.27,11 8.27,9 10,8" fill="none"/>
+            {/* right */}
+            <polygon points="15.2,9 15.2,11 13.46,12 11.73,11 11.73,9 13.46,8" fill="none"/>
+            {/* top-right */}
+            <polygon points="13.46,6 13.46,8 11.73,9 10,8 10,6 11.73,5" fill="none"/>
+            {/* top-left */}
+            <polygon points="10,6 10,8 8.27,9 6.54,8 6.54,6 8.27,5" fill="none"/>
+            {/* left */}
+            <polygon points="8.27,9 8.27,11 6.54,12 4.8,11 4.8,9 6.54,8" fill="none"/>
+            {/* bottom-left */}
+            <polygon points="10,12 10,14 8.27,15 6.54,14 6.54,12 8.27,11" fill="none"/>
+            {/* bottom-right */}
+            <polygon points="13.46,12 13.46,14 11.73,15 10,14 10,12 11.73,11" fill="none"/>
+        </g>
+    </svg>
+)
+
+const NodeIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2} fill="none" />
+    <clipPath id="topHalf">
+      <rect x="0" y="-2" width="24" height="14" />
+    </clipPath>
+    {/* Head */}
+    <circle cx="12" cy="10" r="10" stroke={colorByType(type)} strokeWidth={1.5} fill="none" clipPath="url(#topHalf)" />
+    {/* Forehead symbol */}
+    <g transform="translate(6, 2) scale(0.5)">
+        {symbolByType(type)}
+    </g>
+    {/* Eyes */}
+    <circle cx="8" cy="18" r="2" fill={colorByType(type)} />
+    <circle cx="16" cy="18" r="2" fill={colorByType(type)} />
+    {/* Face */}
+    <path
+        d="M2,12 L4,21 L8,26 L12,27 L16,26 L20,21 L22,12"
+        stroke={colorByType(type)}
+        strokeWidth={1.5}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    />
   </svg>
 );
 
-const GatherIcon = ({ color = 'limegreen', size = 24 }) => (
+const GatherIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-    d="M12,12 m0,-1 a1,1 0 1,1 -2,0 a2,2 0 1,1 4,0 a3,3 0 1,1 -6,0 a4,4 0 1,1 8,0 a5,5 0 1,1 -10,0 a5,5 0 0,1 5.5,-5.5"
-    stroke={color}
-    strokeWidth="1.3"
-    fill="none"
-    strokeLinecap="round"
-    />
+    {symbolByType(type)}
   </svg>
 );
 
-const ScanIcon = ({ color = 'limegreen', size = 24 }) => (
+const ScanIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Pupil */}
-    <circle cx="12" cy="12" r="3" fill={color} />
-    {/* Top arc */}
-    <path
-      d="M4,12 Q12,4 20,12"
-      stroke={color}
-      strokeWidth="1.3"
-      fill="none"
-      strokeLinecap="round"
-    />
-    {/* Bottom arc */}
-    <path
-      d="M4,12 Q12,20 20,12"
-      stroke={color}
-      strokeWidth="1.3"
-      fill="none"
-      strokeLinecap="round"
-    />
+    {symbolByType(type)}
   </svg>
 );
 
-const BuildIcon = ({ color = 'limegreen', size = 24 }) => (
+const BuildIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="2 2 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M10,19 Q11,21 15,21 Q17,21 18,19.5
-        
-        L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
-
-        M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
-
-        M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
-
-        M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
-
-        M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
-      stroke={color}
-      strokeWidth="1.2"
-      fill="none"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    {symbolByType(type)}
   </svg>
 );
 
-const AttackIcon = ({ color = 'limegreen', size = 24 }) => (
+const AttackIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Concentric circles */}
-    <circle cx="12" cy="12" r="10" stroke={color} strokeWidth="1.2" fill="none" />
-    <circle cx="12" cy="12" r="7" stroke={color} strokeWidth="1.2" fill="none" />
-    <circle cx="12" cy="12" r="4" stroke={color} strokeWidth="1.2" fill="none" />
-    <circle cx="12" cy="12" r="1.5" fill={color} />
-
-    {/* Cross lines */}
-    <line x1="2" y1="12" x2="22" y2="12" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
-    <line x1="12" y1="2" x2="12" y2="22" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    {symbolByType(type)}
   </svg>
 );
 
-const HackIcon = ({ color = 'limegreen', size = 24 }) => (
+const HackIcon = ({ size = 24, type }) => (
   <svg width={size} height={size} viewBox="2 2 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Hand */}
-    <path
-      d="M10,19 Q11,21 15,21 Q17,21 18,19.5
-        L19.5,15 Q20,13.5 19,13 Q18,12.5 17.5,14 L17,15.5
-        M17,15.5 L17,8 Q17,7 16,7 Q15,7 15,8 L15,13
-        M15,13 L15,7 Q15,6 14,6 Q13,6 13,7 L13,13
-        M13,13 L13,8 Q13,7 12,7 Q11,7 11,8 L11,13
-        M11,13 L11,11 Q11,10 10,10 Q9,10 9,12 L9,12 Q10,19 10,19"
-      stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"
-    />
-    {/* Eye in palm */}
-    <circle cx="14" cy="16" r="1.5" fill={color} />
-    <path d="M10,16 Q14,12 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
-    <path d="M10,16 Q14,20 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
+    {symbolByType(type)}
   </svg>
 );
 
 // TODO: Assign each action its own icon
 const actionIconsMap = {
-    'assemble-gather-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'assemble-builder-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'assemble-scanner-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'assemble-combat-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'assemble-hacker-node': <GatherNodeIcon color="#00FF00" size={50} />,
-    'refine-iron': <GatherNodeIcon color="#00FF00" size={50} />,
-    'refine-carbon': <GatherNodeIcon color="#00FF00" size={50} />,
-    'gather': <GatherIcon color="limegreen" size={70} />,
-    'build': <BuildIcon color="gold" size={70} />,
-    'scan': <ScanIcon color="rgb(128, 128, 210)" size={70} />,
-    'hack': <HackIcon color="cyan" size={70} />,
-    'attack': <AttackIcon color="#FF0000" size={50} />,
+    'assemble-gather-node': <NodeIcon color="#00FF00" size={50} type="gather"/>,
+    'assemble-builder-node': <NodeIcon color="#00FF00" size={50} type="builder"/>,
+    'assemble-scanner-node': <NodeIcon color="#00FF00" size={50} type="scanner"/>,
+    'assemble-combat-node': <NodeIcon color="#00FF00" size={50} type="combat"/>,
+    'assemble-hacker-node': <NodeIcon color="#00FF00" size={50} type="hacker"/>,
+    'refine-iron': steelIcon,
+    'refine-carbon': grapheneIcon,
+    'gather': <GatherIcon color="limegreen" type="gather" size={70} />,
+    'build': <BuildIcon color="gold" type="build" size={70} />,
+    'scan': <ScanIcon type="scan" size={70} />,
+    'hack': <HackIcon color="cyan" type="hack" size={70} />,
+    'attack': <AttackIcon color="#FF0000" type="attack" size={50} />,
 }
 
 function Camera({mainControlsRef}) {
@@ -556,7 +657,7 @@ function GameRoom({socket}){
                         </div>
                         <div className="resource-field">
                             <div className="icon">
-                                <div className="steel-icon" />
+                                {steelIcon}
                             </div>
                             <h1>{Number(resources.steel.toFixed(1))}</h1>
                         </div>
@@ -611,24 +712,7 @@ function GameRoom({socket}){
                         </div>
                         <div className="resource-field">
                             <div className="icon">
-                                <svg className="graphene-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                    <g transform="scale(1.50) translate(-3, -3)">
-                                        {/* center */}
-                                        <polygon points="11.73,9 11.73,11 10,12 8.27,11 8.27,9 10,8" fill="none"/>
-                                        {/* right */}
-                                        <polygon points="15.2,9 15.2,11 13.46,12 11.73,11 11.73,9 13.46,8" fill="none"/>
-                                        {/* top-right */}
-                                        <polygon points="13.46,6 13.46,8 11.73,9 10,8 10,6 11.73,5" fill="none"/>
-                                        {/* top-left */}
-                                        <polygon points="10,6 10,8 8.27,9 6.54,8 6.54,6 8.27,5" fill="none"/>
-                                        {/* left */}
-                                        <polygon points="8.27,9 8.27,11 6.54,12 4.8,11 4.8,9 6.54,8" fill="none"/>
-                                        {/* bottom-left */}
-                                        <polygon points="10,12 10,14 8.27,15 6.54,14 6.54,12 8.27,11" fill="none"/>
-                                        {/* bottom-right */}
-                                        <polygon points="13.46,12 13.46,14 11.73,15 10,14 10,12 11.73,11" fill="none"/>
-                                    </g>
-                                </svg>
+                                {grapheneIcon}
                             </div>
                             <h1>{resources.graphene}</h1>
                         </div>
