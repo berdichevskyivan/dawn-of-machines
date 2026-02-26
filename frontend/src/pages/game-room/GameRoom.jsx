@@ -99,8 +99,8 @@ const HackIcon = ({ color = 'limegreen', size = 24 }) => (
     />
     {/* Eye in palm */}
     <circle cx="14" cy="16" r="1.5" fill={color} />
-    <path d="M10,16 Q14,12 18,16" stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" />
-    <path d="M10,16 Q14,20 18,16" stroke={color} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+    <path d="M10,16 Q14,12 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
+    <path d="M10,16 Q14,20 18,16" stroke={color} strokeWidth="1" fill="none" strokeLinecap="round" />
   </svg>
 );
 
@@ -113,11 +113,11 @@ const actionIconsMap = {
     'assemble-hacker-node': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-iron': <GatherNodeIcon color="#00FF00" size={50} />,
     'refine-carbon': <GatherNodeIcon color="#00FF00" size={50} />,
-    'gather': <GatherIcon color="limegreen" size={60} />,
-    'build': <BuildIcon color="#00FF00" size={60} />,
-    'scan': <ScanIcon color="#00FF00" size={60} />,
-    'hack': <HackIcon color="#00FF00" size={60} />,
-    'attack': <AttackIcon color="#00FF00" size={50} />,
+    'gather': <GatherIcon color="limegreen" size={70} />,
+    'build': <BuildIcon color="gold" size={70} />,
+    'scan': <ScanIcon color="rgb(128, 128, 210)" size={70} />,
+    'hack': <HackIcon color="cyan" size={70} />,
+    'attack': <AttackIcon color="#FF0000" size={50} />,
 }
 
 function Camera({mainControlsRef}) {
