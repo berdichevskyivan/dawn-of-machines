@@ -120,7 +120,7 @@ const drainElectricity = (gameId) => {
             }
 
             // check in the array of actions for actions belonging to THIS player
-            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId && action.drainsElectricity).length * 0.4;
+            player.resources.electricity -= game.actions.filter(action => action.playerId === player.socketId && action.drainsElectricity).length * 0.2;
 
             // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(player.socketId);
@@ -228,6 +228,20 @@ const resolveActions = (gameId) => {
                         if(newPositionTile) newPositionTile.unit = unit.id;
                     }
 
+                    // On completion, force-clear origin and set destination
+                    if(progress >= 1){
+                        const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
+                        if(originTile && originTile.unit === unit.id) originTile.unit = null;
+
+                        const destPosition = calculatePosition(action.destinationX, action.destinationZ);
+                        const destTile = game.board.get(destPosition);
+                        if(destTile) destTile.unit = unit.id;
+
+                        unit.position = destPosition;
+                        unit.x = action.destinationX;
+                        unit.z = action.destinationZ;
+                    }
+
                     player = game.players.get(unit.player);
 
                     if(player){
@@ -237,19 +251,24 @@ const resolveActions = (gameId) => {
                         ])];
 
                         const playerUnitIds = game.unitsByPlayer.get(player.socketId) || new Set();
-                        const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
-                        const playerBuildingIds = game.buildingsByPlayer.get(player.socketId) || new Set();
-                        const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
+                        const playerUnits = Array.from(playerUnitIds)
+                            .map(id => game.units.get(id))
+                            .filter(Boolean);
 
-                        const unitSightIds = [
-                            ...unit.sight,
-                            unit.position,
-                            previousPosition,
-                        ];
+                        const playerBuildingIds = game.buildingsByPlayer.get(player.socketId) || new Set();
+                        const playerBuildings = Array.from(playerBuildingIds)
+                            .map(id => game.buildings.get(id))
+                            .filter(Boolean);
+
+                        // Recalculate sight for ALL units, not just the moving one
+                        playerUnits.forEach(u => {
+                            if(u.id !== unit.id && u.sight.length === 0){
+                                u.sight = calculateSight(Math.round(u.x), Math.round(u.z));
+                            }
+                        });
 
                         player.sight = [
                             ...playerUnits.flatMap(u => u.sight),
-                            ...unitSightIds,
                             ...playerBuildings.flatMap(b => b.sight),
                         ];
 
@@ -842,7 +861,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('start-action', (data)=>{
-        // we STAMP starting time here. (Date.now())
         console.log(`socket ${socket.id} in room ${data.room} requested an action for selected id ${data.selected.id}`);
 
         const game = gamesByRoom.get(data.room);
@@ -850,24 +868,32 @@ io.on('connection', (socket) => {
 
             // Check if player has the resources to cost that action
             const player = game.players.get(socket.id);
+            const playerSocket = sockets.get(player.socketId);
             const actionCost = actionsMap[data.actionType].cost;
 
             // Iterate over the cost (it can be more than one resource)
             for (const cost of actionCost) {
-                if (player.resources[cost.resource] < cost.amount) {
-                    const playerSocket = sockets.get(player.socketId);
+                if (playerSocket && player.resources[cost.resource] < cost.amount) {
                     playerSocket.emit('logs-update', {
                         log: `Not enough resources. ${cost.amount} ${cost.resource} is required.`,
                         type: 'error'
                     });
-                    return; // exits socket.on handler
-                }else{
-                    console.log(`player has ${cost.amount} ${cost.resource}`)
+                    return;
                 }
             }
 
             if(data.selected.mobile === true){
                 const unit = game.units.get(data.selected.id);
+
+                const hasResourceInSight = unit.sight.some(tileId => {
+                    const tile = game.board.get(tileId);
+                    return tile && tile.resource;
+                });
+                if (!hasResourceInSight) {
+                    playerSocket.emit('logs-update', { log: 'No resource in sight.' });
+                    return;
+                }
+
                 if(unit){
                     game.actions.push({
                         id: randomUUID(),

@@ -233,7 +233,7 @@
 }
 
 .action-icon {
-    height: 65%;
+    height: 70%;
     width: 100%;
     display: flex;
     justify-content: center;
@@ -242,11 +242,12 @@
 
     svg {
         height: 100%;
+        transform: translateY(-2px)
     }
 }
 
 .action-title {
-    height: 35%;
+    height: 30%;
     width: 100%;
     text-align: center;
     display: flex;
@@ -256,6 +257,11 @@
     h1 {
         font-size: 12px;
         margin: 0;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: .1rem;
     }
 }
 
