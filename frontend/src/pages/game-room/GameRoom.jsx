@@ -475,13 +475,13 @@ function GameRoom({socket}){
             setBoard(data.board);
             setUnits(data.units.filter(u => u.player === socket.id));
             setBuildings(data.buildings.filter(b => b.player === socket.id));
-            setResources(data.players.filter(p => p.socketId === socket.id)[0]?.resources);
+            setResources(data.players[0]?.resources);
             setStartingTime(data.startingTime);
             startingTimeRef.current = data.startingTime;
             setGameRoom(data.room);
             setMapResources(data.resources);
-            setSight(data.players.filter(p => p.socketId === socket.id)[0]?.sight);
-            setDiscovered(data.players.filter(p => p.socketId === socket.id)[0]?.discovered);
+            setSight(data.players[0]?.sight);
+            setDiscovered(data.players[0]?.discovered);
         })
 
         // Handles player-update
@@ -574,13 +574,13 @@ function GameRoom({socket}){
             setBoard(startingGameData.board);
             setUnits(startingGameData.units.filter(u => u.player === socket.id));
             setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
-            setResources(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.resources);
+            setResources(startingGameData.players[0]?.resources);
             setStartingTime(startingGameData.startingTime);
             startingTimeRef.current = startingGameData.startingTime;
             setGameRoom(startingGameData.room);
             setMapResources(startingGameData.resources);
-            setSight(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.sight);
-            setDiscovered(startingGameData.players.filter(p => p.socketId === socket.id)[0]?.discovered);
+            setSight(startingGameData.players[0]?.sight);
+            setDiscovered(startingGameData.players[0]?.discovered);
         }
 
         return () => {
