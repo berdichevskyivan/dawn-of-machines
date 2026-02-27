@@ -242,50 +242,51 @@ const resolveActions = (gameId) => {
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
 
                     if(previousPosition !== unit.position){
+                        if(unit.position === undefined || unit.position === null) break;
                         const previousPositionTile = game.board.get(previousPosition);
                         if(previousPositionTile) previousPositionTile.unit = null;
                         const newPositionTile = game.board.get(unit.position);
                         if(newPositionTile) newPositionTile.unit = unit.id;
                     }
 
-                    // On completion, force-clear origin and set destination
-                    if(progress >= 1){
-                        const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
-                        if(originTile && originTile.unit === unit.id) originTile.unit = null;
-
-                        const destPosition = calculatePosition(action.destinationX, action.destinationZ);
-                        const destTile = game.board.get(destPosition);
-                        if(destTile) destTile.unit = unit.id;
-
-                        unit.position = destPosition;
-                        unit.x = action.destinationX;
-                        unit.z = action.destinationZ;
-                    }
-
                     player = game.players.get(unit.player);
 
                     if(player){
-                        unit.sight = new Set([
-                            ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                            ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
-                        ]);
 
-                        const playerUnitIds = game.unitsByPlayer.get(action.playerId) || new Set();
+                        // On completion, force-clear origin and set destination
+                        if(progress >= 1){
+                            const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
+                            if(originTile && originTile.unit === unit.id) originTile.unit = null;
+
+                            const destPosition = calculatePosition(action.destinationX, action.destinationZ);
+                            const destTile = game.board.get(destPosition);
+                            if(destTile) destTile.unit = unit.id;
+
+                            unit.position = destPosition;
+                            unit.x = action.destinationX;
+                            unit.z = action.destinationZ;
+
+                            unit.sight = new Set([
+                                ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
+                                destPosition,
+                            ]);
+                        } else {
+                            unit.sight = new Set([
+                                ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
+                            ]);
+                        }
+
+                        const playerUnitIds = game.unitsByPlayer.get(unit.player) || new Set();
                         const playerUnits = Array.from(playerUnitIds)
                             .map(id => game.units.get(id))
                             .filter(Boolean);
 
-                        const playerBuildingIds = game.buildingsByPlayer.get(action.playerId) || new Set();
+                        const playerBuildingIds = game.buildingsByPlayer.get(unit.player) || new Set();
                         const playerBuildings = Array.from(playerBuildingIds)
                             .map(id => game.buildings.get(id))
                             .filter(Boolean);
-
-                        // Recalculate sight for ALL units, not just the moving one
-                        playerUnits.forEach(u => {
-                            if(u.id !== unit.id && u.sight.size === 0){
-                                u.sight = new Set(calculateSight(Math.round(u.x), Math.round(u.z)));
-                            }
-                        });
 
                         player.sight = new Set([
                             ...playerUnits.flatMap(u => [...u.sight]),
@@ -304,7 +305,7 @@ const resolveActions = (gameId) => {
                         }
                     }
 
-                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z })
+                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight] })
                     break;
                 case 'assemble-gather-node':
                     const building = game.buildings.get(action.buildingId);
@@ -380,7 +381,9 @@ const resolveActions = (gameId) => {
                         if(playerSocket){
                             const playerUnitIds = game.unitsByPlayer.get(action.playerId) || new Set();
                             const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
-                            playerSocket.emit('player-units-update', { units: playerUnits });
+                            playerSocket.emit('player-units-update', { 
+                                units: playerUnits.map(u => ({ ...u, sight: [...u.sight] }))
+                            });
                             playerSocket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
                         } 
                     }
