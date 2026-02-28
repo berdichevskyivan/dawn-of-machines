@@ -1,11 +1,24 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import BottomUIBar from '../../components/ui/bottom-ui-bar/BottomUIBar';
 import * as THREE from 'three';
 
 import './GameRoom.css';
+
+useGLTF.preload('/assets/models/NodeBase.glb');
+
+function NodeBaseModel() {
+    const { scene } = useGLTF('/assets/models/NodeBase.glb');
+
+    return (
+        <primitive
+            object={scene}
+            scale={0.5}
+        />
+    );
+}
 
 const colorByType = (type) => {
     switch(type){
@@ -302,17 +315,13 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
     });
 
     return (
-        <mesh 
+        <group
             ref={unitRef}
-            position={[position[0], 0.5, position[2]]}
-            rotation={[0, 0, 0]}
-            scale={0.5}
-            onClick={(event)=>{ selectUnit(unit.id) }} // left click selects the unit
+            position={[position[0], 0, position[2]]}
+            onClick={() => selectUnit(unit.id)}
         >
-            {/* arg here is: radius */}
-            <sphereGeometry args={[0.5]} />
-            <meshStandardMaterial color="yellow" />
-        </mesh>
+            <NodeBaseModel />
+        </group>
     )
 });
 

@@ -758,6 +758,10 @@ io.on('connection', (socket) => {
                 sockets.delete(originalSocketId);      // remove old key
                 sockets.set(socket.id, socket);        // add new key
             }
+
+            // Update players that had the old socket
+            game.players.delete(originalSocketId);
+            game.players.set(socket.id, player);
             
             // Update units owned by old socket
             const playerUnitIds = game.unitsByPlayer.get(originalSocketId) || new Set();
