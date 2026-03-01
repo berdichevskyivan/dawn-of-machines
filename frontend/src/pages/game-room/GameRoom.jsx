@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useAnimations, Html } from '@react-three/drei';
 import BottomUIBar from '../../components/ui/bottom-ui-bar/BottomUIBar';
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
 
 import './GameRoom.css';
 
@@ -12,6 +13,7 @@ useGLTF.preload('/assets/models/NodeBase.glb');
 function NodeBaseModel({type, rotation}) {
     const groupRef = useRef();
     const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
+    const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
     const { actions } = useAnimations(animations, groupRef);
 
     useEffect(()=>{
@@ -20,7 +22,7 @@ function NodeBaseModel({type, rotation}) {
 
     return (
         <group ref={groupRef} rotation={[0, rotation, 0]}>
-            <primitive object={scene} scale={0.5} />
+            <primitive object={clonedScene} scale={0.5} />
             {/* Perfect for UI elements that can be seen all the time */}
             {/* For Forehead symbols we want to useTexture and import the already existing svg */}
             {/* TODO: add assets/symbols/[symbol].svg */}
