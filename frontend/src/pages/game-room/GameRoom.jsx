@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { OrbitControls, useGLTF, useAnimations, Html } from '@react-three/drei';
 import BottomUIBar from '../../components/ui/bottom-ui-bar/BottomUIBar';
 import * as THREE from 'three';
 
@@ -9,14 +9,27 @@ import './GameRoom.css';
 
 useGLTF.preload('/assets/models/NodeBase.glb');
 
-function NodeBaseModel() {
-    const { scene } = useGLTF('/assets/models/NodeBase.glb');
+function NodeBaseModel({type, rotation}) {
+    const groupRef = useRef();
+    const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
+    const { actions } = useAnimations(animations, groupRef);
+
+    useEffect(()=>{
+        actions['idle']?.play();
+    }, [actions])
 
     return (
-        <primitive
-            object={scene}
-            scale={0.5}
-        />
+        <group ref={groupRef} rotation={[0, rotation, 0]}>
+            <primitive object={scene} scale={0.5} />
+            {/* Perfect for UI elements that can be seen all the time */}
+            {/* For Forehead symbols we want to useTexture and import the already existing svg */}
+            {/* TODO: add assets/symbols/[symbol].svg */}
+            <Html position={[0, 2, 0]} center>
+                <svg width={30} height={30} viewBox="0 0 24 24">
+                    {symbolByType(type)}
+                </svg>
+            </Html>
+        </group>
     );
 }
 
@@ -304,14 +317,21 @@ const SelectionRing = React.memo(function SelectionRing({position}){
 const Unit = React.memo(function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
     const lastPos = useRef([position[0], position[2]]);
+    const rotationRef = useRef(0);
 
     useFrame((state, delta) => {
         if(!unitRef.current) return;
         if (lastPos.current[0] === position[0] && lastPos.current[1] === position[2]) return;
+
+        const dx = position[0] - lastPos.current[0];
+        const dz = position[2] - lastPos.current[1];
+        rotationRef.current = Math.atan2(dx, dz);
         
         const smoothTime = 0.1; // seconds to smooth movement
         unitRef.current.position.x += (position[0] - unitRef.current.position.x) * (delta / smoothTime);
         unitRef.current.position.z += (position[2] - unitRef.current.position.z) * (delta / smoothTime);
+
+        lastPos.current = [position[0], position[2]];
     });
 
     return (
@@ -320,7 +340,7 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
             position={[position[0], 0, position[2]]}
             onClick={() => selectUnit(unit.id)}
         >
-            <NodeBaseModel />
+            <NodeBaseModel type="gather" rotation={rotationRef.current}/>
         </group>
     )
 });
@@ -758,8 +778,7 @@ function GameRoom({socket}){
 
                 {/* Lights */}
                 <ambientLight intensity={Math.PI / 2} />
-                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />
-                <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
+                <directionalLight position={[5, 10, 5]} intensity={2} />
 
                 {/* Tiles */}
                 { visibleTiles.map((tile, i) => (
