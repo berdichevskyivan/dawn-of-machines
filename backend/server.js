@@ -25,19 +25,34 @@ const boardTemplate = new Map(Array.from({length: 100}, (_, i) => [i, {
     building: null,
 }]));
 
+// const actionsMap = {
+//     'assemble-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+//     'assemble-builder-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
+//     'assemble-scanner-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 20 }, { resource: 'iron', amount: 20 }] },
+//     'assemble-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }, { resource: 'graphene', amount: 20 }] },
+//     'assemble-hacker-node': { duration: 12000, cost: [{ resource: 'electricity', amount: 70 }, { resource: 'steel', amount: 30 }, { resource: 'graphene', amount: 20 }] },
+//     'refine-iron': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'iron', amount: 10 }, { resource: 'carbon', amount: 10 }], yield: { resource: 'steel', amount: 10 } },
+//     'refine-carbon': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'carbon', amount: 30 }], yield: { resource: 'graphene', amount: 10 } },
+//     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
+//     'build': { duration: 10000, cost: [{ resource: 'electricity', amount: 30 }] },
+//     'scan': { duration: 5000, cost: [{ resource: 'electricity', amount: 20 }] },
+//     'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] },
+//     'attack': { duration: 1000, cost: [{ resource: 'electricity', amount: 10 }] },
+// }
+// DEV Actions Map
 const actionsMap = {
-    'assemble-gather-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
-    'assemble-builder-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 10 }, { resource: 'iron', amount: 10 }] },
-    'assemble-scanner-node': { duration: 8000, cost: [{ resource: 'electricity', amount: 20 }, { resource: 'iron', amount: 20 }] },
-    'assemble-combat-node': { duration: 18000, cost: [{ resource: 'electricity', amount: 50 }, { resource: 'steel', amount: 50 }, { resource: 'graphene', amount: 20 }] },
-    'assemble-hacker-node': { duration: 12000, cost: [{ resource: 'electricity', amount: 70 }, { resource: 'steel', amount: 30 }, { resource: 'graphene', amount: 20 }] },
-    'refine-iron': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'iron', amount: 10 }, { resource: 'carbon', amount: 10 }], yield: { resource: 'steel', amount: 10 } },
-    'refine-carbon': { duration: 6000, cost: [{ resource: 'electricity', amount: 30 }, { resource: 'carbon', amount: 30 }], yield: { resource: 'graphene', amount: 10 } },
-    'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 10 }] },
-    'build': { duration: 10000, cost: [{ resource: 'electricity', amount: 30 }] },
-    'scan': { duration: 5000, cost: [{ resource: 'electricity', amount: 20 }] },
-    'hack': { duration: 10000, cost: [{ resource: 'electricity', amount: 50 }] },
-    'attack': { duration: 1000, cost: [{ resource: 'electricity', amount: 10 }] },
+    'assemble-gather-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
+    'assemble-builder-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
+    'assemble-scanner-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
+    'assemble-combat-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'steel', amount: 1 }, { resource: 'graphene', amount: 1 }] },
+    'assemble-hacker-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'steel', amount: 1 }, { resource: 'graphene', amount: 1 }] },
+    'refine-iron': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }, { resource: 'carbon', amount: 1 }], yield: { resource: 'steel', amount: 1 } },
+    'refine-carbon': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'carbon', amount: 1 }], yield: { resource: 'graphene', amount: 1 } },
+    'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
+    'build': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
+    'scan': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
+    'hack': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
+    'attack': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
 }
 
 const unitsMap = {
@@ -237,6 +252,8 @@ const resolveActions = (gameId) => {
 
                     unit.x = action.startX + (action.destinationX - action.startX) * progress;
                     unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                    // Unit is now moving
+                    unit.isMoving = true;
 
                     const previousPosition = unit.position;
                     unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
@@ -265,6 +282,8 @@ const resolveActions = (gameId) => {
                             unit.position = destPosition;
                             unit.x = action.destinationX;
                             unit.z = action.destinationZ;
+                            // Unit has stopped moving (Reached destination)
+                            unit.isMoving = false;
 
                             unit.sight = new Set([
                                 ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
@@ -305,7 +324,7 @@ const resolveActions = (gameId) => {
                         }
                     }
 
-                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight] })
+                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
                     break;
                 case 'assemble-gather-node':
                     const building = game.buildings.get(action.buildingId);
@@ -350,6 +369,7 @@ const resolveActions = (gameId) => {
                             id: randomUUID(),
                             hackId: randomUUID(),
                             mobile: true,
+                            isMoving: false,
                             name: 'Gather Node',
                             model: 'gather-node',
                             player: action.playerId,
@@ -545,6 +565,7 @@ io.on('connection', (socket) => {
             id: randomUUID(),
             hackId: randomUUID(),
             mobile: true,
+            isMoving: false,
             name: 'Gather Node',
             model: 'gather-node',
             player: socket.id,
