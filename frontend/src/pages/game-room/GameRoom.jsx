@@ -10,31 +10,23 @@ import './GameRoom.css';
 
 useGLTF.preload('/assets/models/NodeBase.glb');
 
-function NodeBaseModel({type, rotation, unitRef, targetPos}) {
+function NodeBaseModel({type, rotation, unit}) {
     const groupRef = useRef();
     const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
     const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
     const clonedAnimations = useMemo(() => animations.map(clip => clip.clone()), [animations]);
     const { actions } = useAnimations(clonedAnimations, groupRef);
-    const currentAction = useRef(null);
-
+    
     useEffect(() => {
         if (!actions['idle'] || !actions['walk']) return;
-        actions['walk'].play();
-    }, [actions]);
-
-    useFrame(() => {
-        const dx = unitRef.position.x - targetPos[0];
-        const dz = unitRef.position.z - targetPos[1];
-        const distanceSq = dx*dx + dz*dz;
-        const nextAction = distanceSq < 0.01 ? 'idle' : 'walk';
-
-        if (nextAction !== currentAction.current) {
-            actions[currentAction.current]?.fadeOut(0.2);
-            actions[nextAction]?.reset().fadeIn(0.2).play();
-            currentAction.current = nextAction;
+        if(unit && unit.isMoving){
+            actions['idle'].stop();
+            actions['walk'].play();
+        }else{
+            actions['walk'].stop();
+            actions['idle'].play();
         }
-    });
+    }, [unit?.isMoving, actions]);
 
     return (
         <group ref={groupRef} rotation={[0, rotation, 0]}>
@@ -336,16 +328,11 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
     const targetPos = useRef([position[0], position[2]]);
     const rotationRef = useRef(0);
-    const isMoving = useRef(false);
 
     useFrame((state, delta) => {
         if(!unitRef.current) return;
-        if(unitRef.current.position.x === targetPos.current[0] && unitRef.current.position.z === targetPos.current[1]) {
-            isMoving.current = false;
-            return;
-        }
+        if(unitRef.current.position.x === targetPos.current[0] && unitRef.current.position.z === targetPos.current[1]) return;
 
-        isMoving.current = true;
         const dx = targetPos.current[0] - unitRef.current.position.x;
         const dz = targetPos.current[1] - unitRef.current.position.z;
         rotationRef.current = Math.atan2(dx, dz);
@@ -355,7 +342,6 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
 
     useEffect(() => {
         targetPos.current = [position[0], position[2]];
-        isMoving.current = true;
     }, [position]);
 
     return (
@@ -364,7 +350,7 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
             position={[position[0], 0, position[2]]}
             onClick={() => selectUnit(unit.id)}
         >
-            <NodeBaseModel type="gather" rotation={rotationRef.current} unitRef={unitRef.current} targetPos={targetPos.current} />
+            <NodeBaseModel type="gather" rotation={rotationRef.current} unit={unit} />
         </group>
     )
 });
@@ -564,7 +550,7 @@ function GameRoom({socket}){
         // Handles movement
         socket.on('movement-update', (data) => {
             setUnits(prev => prev.map(u => 
-                u.id === data.unitId ? { ...u, x: data.x, z: data.z } : u
+                u.id === data.unitId ? { ...u, x: data.x, z: data.z, sight: data.sight, isMoving: data.isMoving } : u
             ));
         });
 
