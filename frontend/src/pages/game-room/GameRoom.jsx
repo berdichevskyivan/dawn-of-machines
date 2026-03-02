@@ -10,15 +10,34 @@ import './GameRoom.css';
 
 useGLTF.preload('/assets/models/NodeBase.glb');
 
-function NodeBaseModel({type, rotation}) {
+function NodeBaseModel({type, rotation, isMoving}) {
+    console.log(isMoving);
     const groupRef = useRef();
     const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
     const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
-    const { actions } = useAnimations(animations, groupRef);
+    const clonedAnimations = useMemo(() => animations.map(clip => clip.clone()), [animations]);
+    const { actions } = useAnimations(clonedAnimations, groupRef);
+    const currentAnim = useRef(null);
 
-    useEffect(()=>{
-        actions['idle']?.play();
-    }, [actions])
+    useEffect(() => {
+        if (!actions['idle'] || !actions['walk']) return;
+        actions['idle'].play();
+        currentAnim.current = 'idle';
+    }, [actions]);
+
+    useFrame(() => {
+        if (!actions['idle'] || !actions['walk']) return;
+        
+        const target = isMoving.current ? 'walk' : 'idle';
+
+        if(currentAnim){
+            if (currentAnim.current === target) return;
+
+            actions[target].reset().fadeIn(0.2).play();
+            actions[currentAnim.current].fadeOut(0.2);
+            currentAnim.current = target;
+        }
+    });
 
     return (
         <group ref={groupRef} rotation={[0, rotation, 0]}>
@@ -318,23 +337,29 @@ const SelectionRing = React.memo(function SelectionRing({position}){
 
 const Unit = React.memo(function Unit({position, unit, selectUnit}){
     const unitRef = useRef();
-    const lastPos = useRef([position[0], position[2]]);
+    const targetPos = useRef([position[0], position[2]]);
     const rotationRef = useRef(0);
+    const isMoving = useRef(false);
 
     useFrame((state, delta) => {
         if(!unitRef.current) return;
-        if (lastPos.current[0] === position[0] && lastPos.current[1] === position[2]) return;
+        if(unitRef.current.position.x === targetPos.current[0] && unitRef.current.position.z === targetPos.current[1]) {
+            isMoving.current = false;
+            return;
+        }
 
-        const dx = position[0] - lastPos.current[0];
-        const dz = position[2] - lastPos.current[1];
+        isMoving.current = true;
+        const dx = targetPos.current[0] - unitRef.current.position.x;
+        const dz = targetPos.current[1] - unitRef.current.position.z;
         rotationRef.current = Math.atan2(dx, dz);
-        
-        const smoothTime = 0.1; // seconds to smooth movement
-        unitRef.current.position.x += (position[0] - unitRef.current.position.x) * (delta / smoothTime);
-        unitRef.current.position.z += (position[2] - unitRef.current.position.z) * (delta / smoothTime);
-
-        lastPos.current = [position[0], position[2]];
+        unitRef.current.position.x += dx * (delta / 0.1);
+        unitRef.current.position.z += dz * (delta / 0.1);
     });
+
+    useEffect(() => {
+        targetPos.current = [position[0], position[2]];
+        isMoving.current = true;
+    }, [position]);
 
     return (
         <group
@@ -342,7 +367,7 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
             position={[position[0], 0, position[2]]}
             onClick={() => selectUnit(unit.id)}
         >
-            <NodeBaseModel type="gather" rotation={rotationRef.current}/>
+            <NodeBaseModel type="gather" rotation={rotationRef.current} isMoving={isMoving}/>
         </group>
     )
 });
