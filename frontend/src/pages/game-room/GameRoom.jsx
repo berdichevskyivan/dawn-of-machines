@@ -10,32 +10,29 @@ import './GameRoom.css';
 
 useGLTF.preload('/assets/models/NodeBase.glb');
 
-function NodeBaseModel({type, rotation, isMoving}) {
-    console.log(isMoving);
+function NodeBaseModel({type, rotation, unitRef, targetPos}) {
     const groupRef = useRef();
     const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
     const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
     const clonedAnimations = useMemo(() => animations.map(clip => clip.clone()), [animations]);
     const { actions } = useAnimations(clonedAnimations, groupRef);
-    const currentAnim = useRef(null);
+    const currentAction = useRef(null);
 
     useEffect(() => {
         if (!actions['idle'] || !actions['walk']) return;
-        actions['idle'].play();
-        currentAnim.current = 'idle';
+        actions['walk'].play();
     }, [actions]);
 
     useFrame(() => {
-        if (!actions['idle'] || !actions['walk']) return;
-        
-        const target = isMoving.current ? 'walk' : 'idle';
+        const dx = unitRef.position.x - targetPos[0];
+        const dz = unitRef.position.z - targetPos[1];
+        const distanceSq = dx*dx + dz*dz;
+        const nextAction = distanceSq < 0.01 ? 'idle' : 'walk';
 
-        if(currentAnim){
-            if (currentAnim.current === target) return;
-
-            actions[target].reset().fadeIn(0.2).play();
-            actions[currentAnim.current].fadeOut(0.2);
-            currentAnim.current = target;
+        if (nextAction !== currentAction.current) {
+            actions[currentAction.current]?.fadeOut(0.2);
+            actions[nextAction]?.reset().fadeIn(0.2).play();
+            currentAction.current = nextAction;
         }
     });
 
@@ -367,7 +364,7 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
             position={[position[0], 0, position[2]]}
             onClick={() => selectUnit(unit.id)}
         >
-            <NodeBaseModel type="gather" rotation={rotationRef.current} isMoving={isMoving}/>
+            <NodeBaseModel type="gather" rotation={rotationRef.current} unitRef={unitRef.current} targetPos={targetPos.current} />
         </group>
     )
 });
