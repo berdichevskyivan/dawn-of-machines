@@ -55,8 +55,65 @@ const actionsMap = {
     'attack': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
 }
 
-const unitsMap = {
+const unitActionsMap = [
+    { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
+    { type: 'build', title: 'Build', duration: actionsMap['build'] },
+    { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
+    { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
+    { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
+]
 
+const unitsMap = {
+    'gather-node': {
+        mobile: true,
+        isMoving: false,
+        name: 'Gather Node',
+        type: 'gather',
+        speed: 3,
+        integrity: 100,
+        material: 'iron',
+        actions: [...unitActionsMap],
+    },
+    'builder-node':{
+        mobile: true,
+        isMoving: false,
+        name: 'Builder Node',
+        type: 'builder',
+        speed: 3,
+        integrity: 100,
+        material: 'iron',
+        actions: [...unitActionsMap],
+    },
+    'scanner-node':{
+        mobile: true,
+        isMoving: false,
+        name: 'Scanner Node',
+        type: 'scanner',
+        speed: 3,
+        integrity: 100,
+        material: 'iron',
+        actions: [...unitActionsMap],
+    },
+    'combat-node':{
+        mobile: true,
+        isMoving: false,
+        name: 'Combat Node',
+        type: 'combat',
+        speed: 3,
+        integrity: 100,
+        material: 'iron',
+        actions: [...unitActionsMap],
+    },
+    'hacker-node':{
+        mobile: true,
+        isMoving: false,
+        name: 'Hacker Node',
+        type: 'hacker',
+        speed: 3,
+        integrity: 100,
+        material: 'iron',
+        actions: [...unitActionsMap],
+    }
 }
 
 const buildingsMap = {
@@ -228,241 +285,284 @@ const resolveActions = (gameId) => {
         let unit = null;
         let tickProgress = null;
         game.actions.forEach(action => {
-            switch(action.type){
-                case 'electricity-threshold-alert':
-                    player = game.players.get(action.playerId);
-                    playerSocket = sockets.get(action.playerId);
-                    if(playerSocket) playerSocket.emit('logs-update', { log: '[ALERT] Electricity dropped below 50.' });
-                    break;
-                case 'electricity-threshold-critical':
-                    player = game.players.get(action.playerId);
-                    playerSocket = sockets.get(action.playerId);
-                    if(playerSocket) playerSocket.emit('logs-update', { log: '[CRITICAL] Electricity dropped below 25.' });
-                    break;
-                case 'electricity-threshold-fatal':
-                    player = game.players.get(action.playerId);
-                    playerSocket = sockets.get(action.playerId);
-                    if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
-                    break;
-                case 'movement':
-                    unit = game.units.get(action.unitId);
-                    if(!unit) break;
+            if(action.type.startsWith('assemble-')){
+                const building = game.buildings.get(action.buildingId);
+                if(!building) return;
 
-                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                player = game.players.get(building.player);
+                playerSocket = sockets.get(action.playerId);
 
-                    unit.x = action.startX + (action.destinationX - action.startX) * progress;
-                    unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
-                    // Unit is now moving
-                    unit.isMoving = true;
+                if(action.paused) {
+                    // Try to unpause if resources are back
+                    // TODO: Some actions get stuck when paused. Check this.
+                    const canResume = action.costPaid.every(cost => {
+                        const targetPaid = cost.amount * ((Date.now() - action.startingTime) / action.duration);
+                        return player.resources[cost.resource] >= (targetPaid - cost.amountPaid);
+                    });
+                    if(canResume) action.paused = false;
+                    else {
+                        if(playerSocket) playerSocket.emit('logs-update', { log: `Action paused: insufficient resources.`, type: 'action-paused' });
+                        return; // skip tick
+                    }
+                }
 
-                    const previousPosition = unit.position;
-                    unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+                progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                    if(previousPosition !== unit.position){
-                        if(unit.position === undefined || unit.position === null) break;
-                        const previousPositionTile = game.board.get(previousPosition);
-                        if(previousPositionTile) previousPositionTile.unit = null;
-                        const newPositionTile = game.board.get(unit.position);
-                        if(newPositionTile) newPositionTile.unit = unit.id;
+                // Deduct costs progressively
+                action.costPaid.forEach(cost => {
+                    const targetPaid = cost.amount * progress;
+                    const delta = targetPaid - cost.amountPaid;
+                    if(delta > 0){
+                        if(player.resources[cost.resource] >= delta){
+                            player.resources[cost.resource] -= delta;
+                            cost.amountPaid += delta;
+                        } else {
+                            action.paused = true;
+                        }
+                    }
+                });
+
+                // Once we compute the progress, we perform the intended action
+                if(progress >= 1){
+
+                    const nodeType = action.type.replace('assemble-', '');
+                    let node = null;
+
+                    switch(nodeType){
+                        case 'gather-node':
+                            node = {
+                                ...unitsMap['gather-node'],
+                                id: randomUUID(),
+                                hackId: randomUUID(),
+                                player: action.playerId,
+                                sight: calculateSight(building.x, building.z+1),
+                                x: building.x,
+                                z: building.z+1,
+                                position: calculatePosition(building.x, building.z+1),
+                            }
+                            break;
+                        case 'builder-node':
+                            node = {
+                                ...unitsMap['builder-node'],
+                                id: randomUUID(),
+                                hackId: randomUUID(),
+                                player: action.playerId,
+                                sight: calculateSight(building.x, building.z+1),
+                                x: building.x,
+                                z: building.z+1,
+                                position: calculatePosition(building.x, building.z+1),
+                            }
+                            break;
+                        case 'scanner-node':
+                            node = {
+                                ...unitsMap['scanner-node'],
+                                id: randomUUID(),
+                                hackId: randomUUID(),
+                                player: action.playerId,
+                                sight: calculateSight(building.x, building.z+1),
+                                x: building.x,
+                                z: building.z+1,
+                                position: calculatePosition(building.x, building.z+1),
+                            }
+                            break;
+                        case 'combat-node':
+                            node = {
+                                ...unitsMap['combat-node'],
+                                id: randomUUID(),
+                                hackId: randomUUID(),
+                                player: action.playerId,
+                                sight: calculateSight(building.x, building.z+1),
+                                x: building.x,
+                                z: building.z+1,
+                                position: calculatePosition(building.x, building.z+1),
+                            }
+                            break;
+                        case 'hacker-node':
+                            node = {
+                                ...unitsMap['hacker-node'],
+                                id: randomUUID(),
+                                hackId: randomUUID(),
+                                player: action.playerId,
+                                sight: calculateSight(building.x, building.z+1),
+                                x: building.x,
+                                z: building.z+1,
+                                position: calculatePosition(building.x, building.z+1),
+                            }
+                            break;
                     }
 
-                    player = game.players.get(unit.player);
+                    // set in units Map
+                    game.units.set(node.id, node);
+                    // ALSO set in unitsByPlayer Map (in the name of performance)
+                    if (!game.unitsByPlayer.has(action.playerId)) {
+                        game.unitsByPlayer.set(action.playerId, new Set());
+                    }
+                    // here we add the id to the unitsByPlayer map, which contain a Set of ids. Not the unit itself
+                    game.unitsByPlayer.get(action.playerId).add(node.id);
 
-                    if(player){
+                    if(playerSocket){
+                        const playerUnitIds = game.unitsByPlayer.get(action.playerId) || new Set();
+                        const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
+                        playerSocket.emit('player-units-update', { 
+                            units: playerUnits.map(u => ({ ...u, sight: [...u.sight] }))
+                        });
+                        playerSocket.emit('logs-update', { log: `${node.name} was deployed.` })
+                    } 
+                }
 
-                        // On completion, force-clear origin and set destination
-                        if(progress >= 1){
-                            const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
-                            if(originTile && originTile.unit === unit.id) originTile.unit = null;
+                if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
+            }else{
+                switch(action.type){
+                    case 'electricity-threshold-alert':
+                        player = game.players.get(action.playerId);
+                        playerSocket = sockets.get(action.playerId);
+                        if(playerSocket) playerSocket.emit('logs-update', { log: '[ALERT] Electricity dropped below 50.' });
+                        break;
+                    case 'electricity-threshold-critical':
+                        player = game.players.get(action.playerId);
+                        playerSocket = sockets.get(action.playerId);
+                        if(playerSocket) playerSocket.emit('logs-update', { log: '[CRITICAL] Electricity dropped below 25.' });
+                        break;
+                    case 'electricity-threshold-fatal':
+                        player = game.players.get(action.playerId);
+                        playerSocket = sockets.get(action.playerId);
+                        if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
+                        break;
+                    case 'movement':
+                        unit = game.units.get(action.unitId);
+                        if(!unit) break;
 
-                            const destPosition = calculatePosition(action.destinationX, action.destinationZ);
-                            const destTile = game.board.get(destPosition);
-                            if(destTile) destTile.unit = unit.id;
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                            unit.position = destPosition;
-                            unit.x = action.destinationX;
-                            unit.z = action.destinationZ;
-                            // Unit has stopped moving (Reached destination)
-                            unit.isMoving = false;
+                        unit.x = action.startX + (action.destinationX - action.startX) * progress;
+                        unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                        // Unit is now moving
+                        unit.isMoving = true;
 
-                            unit.sight = new Set([
-                                ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
-                                destPosition,
-                            ]);
-                        } else {
-                            unit.sight = new Set([
-                                ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
-                            ]);
+                        const previousPosition = unit.position;
+                        unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+
+                        if(previousPosition !== unit.position){
+                            if(unit.position === undefined || unit.position === null) break;
+                            const previousPositionTile = game.board.get(previousPosition);
+                            if(previousPositionTile) previousPositionTile.unit = null;
+                            const newPositionTile = game.board.get(unit.position);
+                            if(newPositionTile) newPositionTile.unit = unit.id;
                         }
 
-                        const playerUnitIds = game.unitsByPlayer.get(unit.player) || new Set();
-                        const playerUnits = Array.from(playerUnitIds)
-                            .map(id => game.units.get(id))
-                            .filter(Boolean);
+                        player = game.players.get(unit.player);
 
-                        const playerBuildingIds = game.buildingsByPlayer.get(unit.player) || new Set();
-                        const playerBuildings = Array.from(playerBuildingIds)
-                            .map(id => game.buildings.get(id))
-                            .filter(Boolean);
+                        if(player){
 
-                        player.sight = new Set([
-                            ...playerUnits.flatMap(u => [...u.sight]),
-                            ...playerBuildings.flatMap(b => [...b.sight]),
-                        ]);
+                            // On completion, force-clear origin and set destination
+                            if(progress >= 1){
+                                const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
+                                if(originTile && originTile.unit === unit.id) originTile.unit = null;
 
-                        player.discovered = new Set([...player.discovered, ...unit.sight]);
+                                const destPosition = calculatePosition(action.destinationX, action.destinationZ);
+                                const destTile = game.board.get(destPosition);
+                                if(destTile) destTile.unit = unit.id;
 
+                                unit.position = destPosition;
+                                unit.x = action.destinationX;
+                                unit.z = action.destinationZ;
+                                // Unit has stopped moving (Reached destination)
+                                unit.isMoving = false;
+
+                                unit.sight = new Set([
+                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
+                                    destPosition,
+                                ]);
+                            } else {
+                                unit.sight = new Set([
+                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
+                                ]);
+                            }
+
+                            const playerUnitIds = game.unitsByPlayer.get(unit.player) || new Set();
+                            const playerUnits = Array.from(playerUnitIds)
+                                .map(id => game.units.get(id))
+                                .filter(Boolean);
+
+                            const playerBuildingIds = game.buildingsByPlayer.get(unit.player) || new Set();
+                            const playerBuildings = Array.from(playerBuildingIds)
+                                .map(id => game.buildings.get(id))
+                                .filter(Boolean);
+
+                            player.sight = new Set([
+                                ...playerUnits.flatMap(u => [...u.sight]),
+                                ...playerBuildings.flatMap(b => [...b.sight]),
+                            ]);
+
+                            player.discovered = new Set([...player.discovered, ...unit.sight]);
+
+                            playerSocket = sockets.get(action.playerId);
+
+                            if(playerSocket){
+                                playerSocket.emit('sight-discovery-update', {
+                                    sight: [...player.sight],
+                                    discovered: [...player.discovered]
+                                })
+                            }
+                        }
+
+                        io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
+                        break;
+                    case 'refine-iron':
+                        refineResource(game, action);
+                        break;
+                    case 'refine-carbon':
+                        refineResource(game, action);
+                        break;
+                    case 'gather':
+                        unit = game.units.get(action.unitId);
+                        if (!unit) break;
+
+                        player = game.players.get(unit.player);
                         playerSocket = sockets.get(action.playerId);
 
-                        if(playerSocket){
-                            playerSocket.emit('sight-discovery-update', {
-                                sight: [...player.sight],
-                                discovered: [...player.discovered]
-                            })
-                        }
-                    }
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                    io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
-                    break;
-                case 'assemble-gather-node':
-                    const building = game.buildings.get(action.buildingId);
-                    if(!building) break;
-
-                    player = game.players.get(building.player);
-                    playerSocket = sockets.get(action.playerId);
-
-                    if(action.paused) {
-                        // Try to unpause if resources are back
-                        // TODO: Some actions get stuck when paused. Check this.
-                        const canResume = action.costPaid.every(cost => {
-                            const targetPaid = cost.amount * ((Date.now() - action.startingTime) / action.duration);
-                            return player.resources[cost.resource] >= (targetPaid - cost.amountPaid);
+                        // Deduct costs progressively
+                        action.costPaid.forEach(cost => {
+                            const targetPaid = cost.amount * progress;
+                            const delta = targetPaid - cost.amountPaid;
+                            if (delta > 0) {
+                                if (player.resources[cost.resource] >= delta) {
+                                    player.resources[cost.resource] -= delta;
+                                    cost.amountPaid += delta;
+                                } else {
+                                    action.paused = true;
+                                }
+                            }
                         });
-                        if(canResume) action.paused = false;
-                        else {
-                            if(playerSocket) playerSocket.emit('logs-update', { log: `Action paused: insufficient resources.`, type: 'action-paused' });
-                            break; // skip tick
-                        }
-                    }
 
-                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                        // Apply gathering progressively
+                        tickProgress = progress - (action.lastProgress || 0);
+                        action.lastProgress = progress;
 
-                    // Deduct costs progressively
-                    action.costPaid.forEach(cost => {
-                        const targetPaid = cost.amount * progress;
-                        const delta = targetPaid - cost.amountPaid;
-                        if(delta > 0){
-                            if(player.resources[cost.resource] >= delta){
-                                player.resources[cost.resource] -= delta;
-                                cost.amountPaid += delta;
-                            } else {
-                                action.paused = true;
+                        unit.sight.forEach(tileId => {
+                            const tile = game.board.get(tileId);
+                            if (tile && tile.resource) {
+                                const resource = game.resources.find(r => r.id === tile.resource);
+                                if (resource && resource.yield > 0) {
+                                    const modifier = 2; // later we can add other modifiers based on efficiency, for example.
+                                    const amount = Math.min(tickProgress * modifier, resource.yield);
+                                    resource.yield -= amount;
+                                    player.resources[resource.resource] = (player.resources[resource.resource] || 0) + amount;
+                                }
                             }
-                        }
-                    });
+                        });
 
-                    // Once we compute the progress, we perform the intended action
-                    if(progress >= 1){
-                        const gatherNode = {
-                            id: randomUUID(),
-                            hackId: randomUUID(),
-                            mobile: true,
-                            isMoving: false,
-                            name: 'Gather Node',
-                            model: 'gather-node',
-                            player: action.playerId,
-                            sight: calculateSight(building.x, building.z+1),
-                            x: building.x,
-                            z: building.z+1,
-                            position: calculatePosition(building.x, building.z+1),
-                            speed: 3,
-                            integrity: 100,
-                            material: 'iron',
-                            actions: [
-                                { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
-                                { type: 'build', title: 'Build', duration: actionsMap['build'] },
-                                { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
-                                { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
-                                { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
-                            ], // to do, a template for this since all nodes have the same action map
-                        }
-
-                        // set in units Map
-                        game.units.set(gatherNode.id, gatherNode);
-                        // ALSO set in unitsByPlayer Map (in the name of performance)
-                        if (!game.unitsByPlayer.has(action.playerId)) {
-                            game.unitsByPlayer.set(action.playerId, new Set());
-                        }
-                        // here we add the id to the unitsByPlayer map, which contain a Set of ids. Not the unit itself
-                        game.unitsByPlayer.get(action.playerId).add(gatherNode.id);
-
-                        if(playerSocket){
-                            const playerUnitIds = game.unitsByPlayer.get(action.playerId) || new Set();
-                            const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
-                            playerSocket.emit('player-units-update', { 
-                                units: playerUnits.map(u => ({ ...u, sight: [...u.sight] }))
-                            });
-                            playerSocket.emit('logs-update', { log: `${gatherNode.name} was deployed.` })
+                        if (playerSocket){
+                            playerSocket.emit('player-update', { playerData: player });
+                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
                         } 
-                    }
-
-                    if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
-
-                    break;
-                case 'refine-iron':
-                    refineResource(game, action);
-                    break;
-                case 'refine-carbon':
-                    refineResource(game, action);
-                    break;
-                case 'gather':
-                    unit = game.units.get(action.unitId);
-                    if (!unit) break;
-
-                    player = game.players.get(unit.player);
-                    playerSocket = sockets.get(action.playerId);
-
-                    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
-
-                    // Deduct costs progressively
-                    action.costPaid.forEach(cost => {
-                        const targetPaid = cost.amount * progress;
-                        const delta = targetPaid - cost.amountPaid;
-                        if (delta > 0) {
-                            if (player.resources[cost.resource] >= delta) {
-                                player.resources[cost.resource] -= delta;
-                                cost.amountPaid += delta;
-                            } else {
-                                action.paused = true;
-                            }
-                        }
-                    });
-
-                    // Apply gathering progressively
-                    tickProgress = progress - (action.lastProgress || 0);
-                    action.lastProgress = progress;
-
-                    unit.sight.forEach(tileId => {
-                        const tile = game.board.get(tileId);
-                        if (tile && tile.resource) {
-                            const resource = game.resources.find(r => r.id === tile.resource);
-                            if (resource && resource.yield > 0) {
-                                const modifier = 2; // later we can add other modifiers based on efficiency, for example.
-                                const amount = Math.min(tickProgress * modifier, resource.yield);
-                                resource.yield -= amount;
-                                player.resources[resource.resource] = (player.resources[resource.resource] || 0) + amount;
-                            }
-                        }
-                    });
-
-                    if (playerSocket){
-                        playerSocket.emit('player-update', { playerData: player });
-                        playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
-                    } 
-                    io.to(game.room).emit('resources-update', game.resources);
-                    break;
+                        io.to(game.room).emit('resources-update', game.resources);
+                        break;
+                }
             }
         });
 
@@ -562,27 +662,14 @@ io.on('connection', (socket) => {
         // TODO: Add efficiency.
         // Units can perform all actions, but they have different efficiency mapping.
         const starterUnit = {
+            ...unitsMap['gather-node'],
             id: randomUUID(),
             hackId: randomUUID(),
-            mobile: true,
-            isMoving: false,
-            name: 'Gather Node',
-            model: 'gather-node',
             player: socket.id,
             sight: new Set(),
             x: 0,
             z: 0,
             position: null,
-            speed: 3,
-            integrity: 100,
-            material: 'iron',
-            actions: [
-                { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
-                { type: 'build', title: 'Build', duration: actionsMap['build'] },
-                { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
-                { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
-                { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
-            ],
         };
 
         game.units.set(starterUnit.id, starterUnit);

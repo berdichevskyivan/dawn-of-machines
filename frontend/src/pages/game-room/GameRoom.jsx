@@ -10,7 +10,7 @@ import './GameRoom.css';
 
 useGLTF.preload('/assets/models/NodeBase.glb');
 
-function NodeBaseModel({type, rotation, unit}) {
+function NodeBaseModel({unit, rotation}) {
     const groupRef = useRef();
     const { scene, animations } = useGLTF('/assets/models/NodeBase.glb');
     const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
@@ -36,7 +36,7 @@ function NodeBaseModel({type, rotation, unit}) {
             {/* TODO: add assets/symbols/[symbol].svg */}
             <Html position={[0, 2, 0]} center>
                 <svg width={30} height={30} viewBox="0 0 24 24">
-                    {symbolByType(type)}
+                    {symbolByType(unit.type)}
                 </svg>
             </Html>
         </group>
@@ -350,7 +350,7 @@ const Unit = React.memo(function Unit({position, unit, selectUnit}){
             position={[position[0], 0, position[2]]}
             onClick={() => selectUnit(unit.id)}
         >
-            <NodeBaseModel type="gather" rotation={rotationRef.current} unit={unit} />
+            <NodeBaseModel unit={unit} rotation={rotationRef.current} />
         </group>
     )
 });
