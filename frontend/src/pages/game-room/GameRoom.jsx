@@ -281,6 +281,9 @@ const actionIconsMap = {
     'assemble-scanner-node': <NodeIcon color="#00FF00" size={50} type="scanner"/>,
     'assemble-combat-node': <NodeIcon color="#00FF00" size={50} type="combat"/>,
     'assemble-hacker-node': <NodeIcon color="#00FF00" size={50} type="hacker"/>,
+    'build-assembly-plant': <BuildIcon color="#00FF00" size={50} type="build"/>,
+    'build-generator': <BuildIcon color="#00FF00" size={50} type="build"/>,
+    'build-refinery': <BuildIcon color="#00FF00" size={50} type="build"/>,
     'refine-iron': steelIcon,
     'refine-carbon': grapheneIcon,
     'gather': <GatherIcon color="limegreen" type="gather" size={70} />,
@@ -622,6 +625,10 @@ function GameRoom({socket}){
             setUnits(data.units);
         });
 
+        socket.on('player-buildings-update', (data)=>{
+            setBuildings(data.buildings);
+        });
+
         socket.on('logs-update', (data)=>{
             // we timestamp it here
             const elapsed = Date.now() - startingTimeRef.current;
@@ -664,28 +671,6 @@ function GameRoom({socket}){
             socket.off('sight-discovery-update');
         }
     }, []);
-
-    const KEYBINDS = ["q", "w", "e", "r", "t"];
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (!selected?.actions?.length) return;
-
-            const active = document.activeElement;
-            if(active && ["INPUT", "TEXTAREA"].includes(active.tagName)) return;
-
-            const key = e.key.toLowerCase();
-            const index = KEYBINDS.indexOf(key);
-
-            if (index === -1) return;
-            if (!selected.actions[index]) return;
-
-            startAction(selected.actions[index].type);
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [selected, startAction]);
 
     useEffect(() => {
         if (!commsMainRef.current) return;

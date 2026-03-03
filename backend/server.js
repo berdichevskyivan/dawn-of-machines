@@ -46,6 +46,9 @@ const actionsMap = {
     'assemble-scanner-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
     'assemble-combat-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'steel', amount: 1 }, { resource: 'graphene', amount: 1 }] },
     'assemble-hacker-node': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'steel', amount: 1 }, { resource: 'graphene', amount: 1 }] },
+    'build-assembly-plant': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
+    'build-refinery': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
+    'build-generator': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }] },
     'refine-iron': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'iron', amount: 1 }, { resource: 'carbon', amount: 1 }], yield: { resource: 'steel', amount: 1 } },
     'refine-carbon': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }, { resource: 'carbon', amount: 1 }], yield: { resource: 'graphene', amount: 1 } },
     'gather': { duration: 2000, cost: [{ resource: 'electricity', amount: 1 }] },
@@ -58,6 +61,9 @@ const actionsMap = {
 const unitActionsMap = [
     { type: 'gather', title: 'Gather', duration: actionsMap['gather'] },
     { type: 'build', title: 'Build', duration: actionsMap['build'] },
+    { type: 'build-assembly-plant', title: 'Assembly Plant', duration: actionsMap['build-assembly-plant'] },
+    { type: 'build-generator', title: 'Generator', duration: actionsMap['build-generator'] },
+    { type: 'build-refinery', title: 'Refinery', duration: actionsMap['build-refinery'] },
     { type: 'scan', title: 'Scan', duration: actionsMap['scan'] },
     { type: 'hack', title: 'Hack', duration: actionsMap['hack'] },
     { type: 'attack', title: 'Attack', duration: actionsMap['attack'] },
@@ -117,7 +123,42 @@ const unitsMap = {
 }
 
 const buildingsMap = {
-
+    'assembly-plant':{
+        mobile: false,
+        name: 'Assembly Plant',
+        type: 'assembly-plant',
+        sight: new Set(),
+        integrity: 100,
+        material: 'iron',
+        actions: [
+            { type: 'assemble-gather-node', title: 'Gather Node', duration: actionsMap['assemble-gather-node'] },
+            { type: 'assemble-builder-node', title: 'Builder Node', duration: actionsMap['assemble-builder-node'] },
+            { type: 'assemble-scanner-node', title: 'Scanner Node', duration: actionsMap['assemble-scanner-node'] },
+            { type: 'assemble-hacker-node', title: 'Hacker Node', duration: actionsMap['assemble-hacker-node'] },
+            { type: 'assemble-combat-node', title: 'Combat Node', duration: actionsMap['assemble-combat-node'] },
+        ],
+    },
+    'refinery':{
+        mobile: false,
+        name: 'Refinery',
+        type: 'refinery',
+        sight: new Set(),
+        integrity: 100,
+        material: 'iron',
+        actions: [
+            { type: 'refine-iron', title: 'Refine Iron', duration: actionsMap['refine-iron'] },
+            { type: 'refine-carbon', title: 'Refine Carbon', duration: actionsMap['refine-carbon'] },
+        ],
+    },
+    'generator':{
+        mobile: false,
+        name: 'Generator',
+        type: 'generator',
+        sight: new Set(),
+        integrity: 100,
+        material: 'iron',
+        actions: [],
+    }
 }
 
 const playerMap = {
@@ -272,6 +313,108 @@ const refineResource = (game, action) => {
         playerSocket.emit('player-update', { playerData: player });
         playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
     }
+}
+
+const buildBuilding = (game, action) => {
+    const unit = game.units.get(action.unitId);
+    if(!unit) return;
+
+    player = game.players.get(unit.player);
+    playerSocket = sockets.get(action.playerId);
+
+    if(action.paused) {
+        const canResume = action.costPaid.every(cost => {
+            const targetPaid = cost.amount * ((Date.now() - action.startingTime) / action.duration);
+            return player.resources[cost.resource] >= (targetPaid - cost.amountPaid);
+        });
+        if(canResume) action.paused = false;
+        else {
+            if(playerSocket) playerSocket.emit('logs-update', { log: `Action paused: insufficient resources.`, type: 'action-paused' });
+            return;
+        }
+    }
+
+    progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+    action.costPaid.forEach(cost => {
+        const targetPaid = cost.amount * progress;
+        const delta = targetPaid - cost.amountPaid;
+        if(delta > 0){
+            if(player.resources[cost.resource] >= delta){
+                player.resources[cost.resource] -= delta;
+                cost.amountPaid += delta;
+            } else {
+                action.paused = true;
+            }
+        }
+    });
+
+    if(progress >= 1){
+
+        const buildingType = action.type.replace('build-', '');
+        let building = null;
+
+        switch(buildingType){
+            case 'assembly-plant':
+                building = {
+                    ...buildingsMap['assembly-plant'],
+                    id: randomUUID(),
+                    hackId: randomUUID(),
+                    player: action.playerId,
+                    sight: calculateSight(unit.x, unit.z+1),
+                    x: unit.x,
+                    z: unit.z+1,
+                    position: calculatePosition(unit.x, unit.z+1),
+                };
+                break;
+            case 'generator':
+                building = {
+                    ...buildingsMap['generator'],
+                    id: randomUUID(),
+                    hackId: randomUUID(),
+                    player: action.playerId,
+                    sight: calculateSight(unit.x, unit.z+1),
+                    x: unit.x,
+                    z: unit.z+1,
+                    position: calculatePosition(unit.x, unit.z+1),
+                };
+                break;
+            case 'refinery':
+                building = {
+                    ...buildingsMap['refinery'],
+                    id: randomUUID(),
+                    hackId: randomUUID(),
+                    player: action.playerId,
+                    sight: calculateSight(unit.x, unit.z+1),
+                    x: unit.x,
+                    z: unit.z+1,
+                    position: calculatePosition(unit.x, unit.z+1),
+                };
+                break;
+        }
+
+        game.buildings.set(building.id, building);
+
+        if (!game.buildingsByPlayer.has(action.playerId)) {
+            game.buildingsByPlayer.set(action.playerId, new Set());
+        }
+
+        game.buildingsByPlayer.get(action.playerId).add(building.id);
+
+        // also add in buildingsByType
+        game.buildingsByType.get(building.type).add(building.id);
+
+        if(playerSocket){
+            const playerBuildingIds = game.buildingsByPlayer.get(action.playerId) || new Set();
+            const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
+            playerSocket.emit('player-buildings-update', { 
+                buildings: playerBuildings.map(b => ({ ...b, sight: [...b.sight] }))
+            });
+            playerSocket.emit('logs-update', { log: `${building.name} was built.` })
+        } 
+    }
+
+    if(playerSocket) playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type })
 }
 
 const resolveActions = (gameId) => {
@@ -516,6 +659,11 @@ const resolveActions = (gameId) => {
                     case 'refine-carbon':
                         refineResource(game, action);
                         break;
+                    case 'build-assembly-plant':
+                    case 'build-generator':
+                    case 'build-refinery':
+                        buildBuilding(game, action);
+                        break;
                     case 'gather':
                         unit = game.units.get(action.unitId);
                         if (!unit) break;
@@ -676,61 +824,31 @@ io.on('connection', (socket) => {
 
         const starterBuildings = [
             {
+                ...buildingsMap['assembly-plant'],
                 id: randomUUID(),
                 hackId: randomUUID(),
-                mobile: false,
-                name: 'Assembly Plant',
-                model: 'assembly-plant',
-                type: 'assembly-plant',
                 player: socket.id,
-                sight: new Set(),
                 x: 1,
                 z: 1,
                 position: null,
-                integrity: 100,
-                material: 'iron',
-                actions: [
-                    { type: 'assemble-gather-node', title: 'Gather Node', duration: actionsMap['assemble-gather-node'] },
-                    { type: 'assemble-builder-node', title: 'Builder Node', duration: actionsMap['assemble-builder-node'] },
-                    { type: 'assemble-scanner-node', title: 'Scanner Node', duration: actionsMap['assemble-scanner-node'] },
-                    { type: 'assemble-hacker-node', title: 'Hacker Node', duration: actionsMap['assemble-hacker-node'] },
-                    { type: 'assemble-combat-node', title: 'Combat Node', duration: actionsMap['assemble-combat-node'] },
-                ],
             },
             {
+                ...buildingsMap['generator'],
                 id: randomUUID(),
                 hackId: randomUUID(),
-                mobile: false,
-                name: 'Generator',
-                model: 'generator',
-                type: 'generator',
                 player: socket.id,
-                sight: new Set(),
                 x: 2,
                 z: 2,
                 position: null,
-                integrity: 100,
-                material: 'iron',
-                actions: [],
             },
             {
+                ...buildingsMap['refinery'],
                 id: randomUUID(),
                 hackId: randomUUID(),
-                mobile: false,
-                name: 'Refinery',
-                model: 'refinery',
-                type: 'refinery',
                 player: socket.id,
-                sight: new Set(),
                 x: 3,
                 z: 3,
                 position: null,
-                integrity: 100,
-                material: 'iron',
-                actions: [
-                    { type: 'refine-iron', title: 'Refine Iron', duration: actionsMap['refine-iron'] },
-                    { type: 'refine-carbon', title: 'Refine Carbon', duration: actionsMap['refine-carbon'] },
-                ],
             },
         ];
 
@@ -1034,7 +1152,7 @@ io.on('connection', (socket) => {
                     const tile = game.board.get(tileId);
                     return tile && tile.resource;
                 });
-                if (!hasResourceInSight) {
+                if (!hasResourceInSight && data.actionType === 'gather') {
                     playerSocket.emit('logs-update', { log: 'No resource in sight.' });
                     return;
                 }

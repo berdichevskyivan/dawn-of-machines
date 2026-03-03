@@ -1,4 +1,4 @@
-import React, {useRef, useEffect} from 'react';
+import React, {useRef, useEffect, useState} from 'react';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -141,6 +141,48 @@ const BottomUIBar = React.memo(({
     graphData,
     commsMainRef,
 }) => {
+    const [buildMenuOpen, setBuildMenuOpen] = useState(false);
+
+    const KEYBINDS = ["q", "w", "e", "r", "t"];
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!selected?.actions?.length) return;
+
+            let visibleActions = buildMenuOpen === true ? selected.actions.filter(a => a.type.startsWith('build-')) : selected.actions.filter(a => !a.type.startsWith('build-'));
+
+            const active = document.activeElement;
+            if(active && ["INPUT", "TEXTAREA"].includes(active.tagName)) return;
+
+            const key = e.key.toLowerCase();
+
+            // Backspace
+            if (e.key === "Backspace") {
+                e.preventDefault();
+                setBuildMenuOpen(false);
+                return;
+            }
+
+            const index = KEYBINDS.indexOf(key);
+
+            if (index === -1) return;
+            if (!visibleActions[index]) return;
+
+            if(visibleActions[index].type === 'build'){
+                setBuildMenuOpen(true);
+            }else{
+                startAction(visibleActions[index].type);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [selected, startAction]);
+
+    useEffect(() => {
+        setBuildMenuOpen(false);
+    }, [selected]);
+
     return (
         <Html wrapperClass="bottom-ui-bar" style={{ pointerEvents: 'auto' }}>
             <div
@@ -151,12 +193,38 @@ const BottomUIBar = React.memo(({
                 {/* Left Panel */}
                 <div className="bottom-ui-panel left-panel" onContextMenu={(e) => e.stopPropagation()}>
                     <div className="actions-container">
-                        {selected?.actions?.length > 0 &&
-                            selected.actions.map((action, index) => (
+                        {selected?.actions?.length > 0 && buildMenuOpen === false &&
+                            selected.actions.filter(a => !a.type.startsWith('build-')).map((action, index) => (
                                 <div
                                     key={action.type}
                                     className="action-container"
-                                    onClick={() => startAction(action.type)}
+                                    onClick={() => {
+                                        if(action.type === 'build'){
+                                            setBuildMenuOpen(true);
+                                        } else {
+                                            startAction(action.type)
+                                        }
+                                    }}
+                                >
+                                    <div className="action-bound-key">
+                                        {index === 0 && <p>Q</p>}
+                                        {index === 1 && <p>W</p>}
+                                        {index === 2 && <p>E</p>}
+                                        {index === 3 && <p>R</p>}
+                                        {index === 4 && <p>T</p>}
+                                    </div>
+                                    <div className="action-icon">{actionIconsMap[action.type]}</div>
+                                    <div className="action-title">
+                                        <h1>{action.title}</h1>
+                                    </div>
+                                </div>
+                            ))}
+                        {selected?.actions?.length > 0 && buildMenuOpen === true &&
+                            selected.actions.filter(a => a.type.startsWith('build-')).map((action, index) => (
+                                <div
+                                    key={action.type}
+                                    className="action-container"
+                                    onClick={() => {startAction(action.type)}}
                                 >
                                     <div className="action-bound-key">
                                         {index === 0 && <p>Q</p>}
