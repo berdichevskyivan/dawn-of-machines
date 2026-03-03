@@ -28,6 +28,39 @@ function NodeBaseModel({unit, rotation}) {
         }
     }, [unit?.isMoving, actions]);
 
+    useEffect(()=>{
+        if (!unit) return;
+
+        clonedScene.traverse((child) => {
+            if (!child.isMesh) return;
+
+            if (Array.isArray(child.material)) {
+                child.material = child.material.map(mat => mat.clone());
+                child.material.forEach(mat => {
+                    if (!child.name.includes('Eye')) {
+                        mat.color.set('#555');
+                        mat.metalness = 0.8;
+                        mat.roughness = 0.4;
+                    } else {
+                        mat.emissive.set(colorByType(unit.type));
+                    }
+                });
+            } else {
+                child.material = child.material.clone();
+                if (child.name.includes('Eye')) {
+                    child.material = new THREE.MeshBasicMaterial({
+                        color: colorByType(unit.type),
+                        toneMapped: false,
+                    });
+                } else {
+                    child.material.color.set('#555');
+                    child.material.metalness = 0.8;
+                    child.material.roughness = 0.4;
+                }
+            }
+        });
+    },[unit, clonedScene])
+
     return (
         <group ref={groupRef} rotation={[0, rotation, 0]}>
             <primitive object={clonedScene} scale={0.5} />
