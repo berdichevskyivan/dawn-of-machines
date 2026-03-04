@@ -312,10 +312,6 @@ function Tile({position, tile, moveToTile}){
 
     const tileRef = useRef();
 
-    // useFrame((state, delta) => {
-    //     tileRef.current.scale.x += 0.01;
-    // })
-
     return (
         <group position={position} rotation={[-Math.PI / 2, 0, 0]}>
             {/* Outline */}
@@ -329,7 +325,6 @@ function Tile({position, tile, moveToTile}){
             </mesh>
 
             {/* Tile */}
-            {/* On context menu, if unit, we trigger movement */}
             <mesh 
                 ref={tileRef}
                 renderOrder={1}

@@ -194,7 +194,6 @@ const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
         const nx = x + dx;
         const nz = z + dz;
 
-        // skip tiles that are outside the board
         if (nx < 0 || nx >= boardWidth || nz < 0 || nz >= boardHeight) continue;
 
         sightTileIds.push(nz * boardWidth + nx);
@@ -213,8 +212,7 @@ const drainElectricity = (gameId) => {
 
     if(game){
         game.players.forEach((player, socketId) => {
-            // just existing drains a percentage, start with this
-            player.resources.electricity -= 0.1; // rate for dev :) 
+            player.resources.electricity -= 0.1;
 
             if(player.thresholdState === undefined) player.thresholdState = null;
 
@@ -255,7 +253,6 @@ const drainElectricity = (gameId) => {
             // check in the array of actions for actions belonging to THIS player
             player.resources.electricity -= game.actions.filter(action => action.playerId === socketId && action.drainsElectricity).length * 0.2;
 
-            // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(socketId);
             if (playerSocket) playerSocket.emit('player-update', { playerData: player });
         })
@@ -277,7 +274,6 @@ const generateElectricity = (gameId) => {
 
             player.resources.electricity += playerGenerators.length * 0.4;
 
-            // then, for each player, we use their socket to emit, ONLY to THEIR socket
             const playerSocket = sockets.get(socketId);
             if (playerSocket) playerSocket.emit('player-update', { playerData: player });
         })
@@ -400,8 +396,6 @@ const buildBuilding = (game, action) => {
         }
 
         game.buildingsByPlayer.get(action.playerId).add(building.id);
-
-        // also add in buildingsByType
         game.buildingsByType.get(building.type).add(building.id);
 
         if(playerSocket){
@@ -421,7 +415,6 @@ const resolveActions = (gameId) => {
     const game = games.get(gameId);
 
     if(game){
-        // now iterate over the actions
         let progress = null;
         let player = null;
         let playerSocket = null;
@@ -534,13 +527,12 @@ const resolveActions = (gameId) => {
                             break;
                     }
 
-                    // set in units Map
                     game.units.set(node.id, node);
-                    // ALSO set in unitsByPlayer Map (in the name of performance)
+
                     if (!game.unitsByPlayer.has(action.playerId)) {
                         game.unitsByPlayer.set(action.playerId, new Set());
                     }
-                    // here we add the id to the unitsByPlayer map, which contain a Set of ids. Not the unit itself
+
                     game.unitsByPlayer.get(action.playerId).add(node.id);
 
                     if(playerSocket){
@@ -579,7 +571,6 @@ const resolveActions = (gameId) => {
 
                         unit.x = action.startX + (action.destinationX - action.startX) * progress;
                         unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
-                        // Unit is now moving
                         unit.isMoving = true;
 
                         const previousPosition = unit.position;
@@ -596,8 +587,6 @@ const resolveActions = (gameId) => {
                         player = game.players.get(unit.player);
 
                         if(player){
-
-                            // On completion, force-clear origin and set destination
                             if(progress >= 1){
                                 const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
                                 if(originTile && originTile.unit === unit.id) originTile.unit = null;
@@ -609,7 +598,6 @@ const resolveActions = (gameId) => {
                                 unit.position = destPosition;
                                 unit.x = action.destinationX;
                                 unit.z = action.destinationZ;
-                                // Unit has stopped moving (Reached destination)
                                 unit.isMoving = false;
 
                                 unit.sight = new Set([
