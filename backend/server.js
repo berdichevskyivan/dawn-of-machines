@@ -7,7 +7,9 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "http://localhost:5173"
+        // Multiplayer Dev Mode
+        // origin: "http://localhost:5173"
+        origin: '*',
     }
 });
 
@@ -627,6 +629,29 @@ const resolveActions = (gameId) => {
                                 ...playerBuildings.flatMap(b => [...b.sight]),
                             ]);
 
+                            // once i have the player sight i can determine which units, buildings and resources are in his sight
+                            // by checking the tiles
+                            // then, we will send this data in the sight-discovery-update that already exists
+                            // for now, do so with units and buildings so we can see other players units and buildings
+
+                            const discoveredUnits = [];
+                            const discoveredBuildings = [];
+                            player.sight.forEach((tileId)=>{
+                                const tile = game.board.get(tileId);
+                                if(tile){
+                                    // calculate units in sight
+                                    if(tile.unit){
+                                        const unit = game.units.get(tile.unit);
+                                        discoveredUnits.push(unit);
+                                    }
+                                    // calculate buildings in sight
+                                    if(tile.building){
+                                        const building = game.buildings.get(tile.buildings);
+                                        discoveredBuildings.push(building);
+                                    }
+                                }
+                            })
+
                             player.discovered = new Set([...player.discovered, ...unit.sight]);
 
                             playerSocket = sockets.get(action.playerId);
@@ -634,7 +659,9 @@ const resolveActions = (gameId) => {
                             if(playerSocket){
                                 playerSocket.emit('sight-discovery-update', {
                                     sight: [...player.sight],
-                                    discovered: [...player.discovered]
+                                    discovered: [...player.discovered],
+                                    discoveredUnits,
+                                    discoveredBuildings,
                                 })
                             }
                         }
@@ -741,7 +768,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('games-fetch', () => {
-        io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime })));
+        io.emit('games-update', Array.from(games.values()).map(g => ({ title: g.title, startingTime: g.startingTime, room: g.room })));
     });
 
     socket.on('game-start', () => {
@@ -930,24 +957,188 @@ io.on('connection', (socket) => {
         
         const safeGameData = { 
             ...game,
-            units: Array.from(game.units.values()).map(u => ({
-                ...u,
-                sight: [...u.sight]
-            })),
-            buildings: Array.from(game.buildings.values()).map(b => ({
-                ...b,
-                sight: [...b.sight]
-            })),
+            units: Array.from(game.unitsByPlayer.get(socket.id)).map(id => {
+                const u = game.units.get(id);
+                return {
+                    ...u,
+                    sight: [...u.sight]
+                };
+            }),
+            buildings: Array.from(game.buildingsByPlayer.get(socket.id)).map(id => {
+                const b = game.buildings.get(id);
+                return {
+                    ...b,
+                    sight: [...b.sight]
+                };
+            }),
             board: Array.from(game.board.values()),
-            players: [{ 
+            player: { 
                 ...game.players.get(socket.id),
                 sight: [...game.players.get(socket.id).sight],
                 discovered: [...game.players.get(socket.id).discovered]
-            }],
+            },
         };
         delete safeGameData.id;
 
         socket.emit('starting-game-data', safeGameData);
+    })
+    // TODO: Calculate units or buildings in joining player's sight
+    socket.on('game-join', ({room})=>{
+        const game = gamesByRoom.get(room);
+        if(!game) return;
+
+        // If this socket already started a game, return
+        if(gamesByStarted.get(socket.id)){
+            return;
+        }
+
+        // we have the room, now we may join
+        socket.join(room);
+
+        console.log(`player ${socket.id} has joined room ${room}`);
+
+        // add new player to game.players
+        game.players.set(socket.id, {
+            name: `Player ${game.players.size+1}`,
+            startedGame: false,
+            ...playerMap,
+        })
+
+        // ok we now have the game, we need to put that player in the game
+        // the player is essentially the socket id so we have all we need here
+        // prepare starter units and buildings
+        const starterUnit = {
+            ...unitsMap['gather-node'],
+            id: randomUUID(),
+            hackId: randomUUID(),
+            player: socket.id,
+            sight: new Set(),
+            x: 9,
+            z: 9, // other end of the board for now
+            position: null,
+        };
+
+        const starterBuildings = [
+            {
+                ...buildingsMap['assembly-plant'],
+                id: randomUUID(),
+                hackId: randomUUID(),
+                player: socket.id,
+                x: 8,
+                z: 8,
+                position: null,
+            },
+            {
+                ...buildingsMap['generator'],
+                id: randomUUID(),
+                hackId: randomUUID(),
+                player: socket.id,
+                x: 8,
+                z: 7,
+                position: null,
+            },
+            {
+                ...buildingsMap['refinery'],
+                id: randomUUID(),
+                hackId: randomUUID(),
+                player: socket.id,
+                x: 8,
+                z: 6,
+                position: null,
+            },
+        ];
+
+        // add units to game and maps
+        game.units.set(starterUnit.id, starterUnit);
+        if(!game.unitsByPlayer.has(socket.id)){
+            game.unitsByPlayer.set(socket.id, new Set());
+        }
+        game.unitsByPlayer.get(socket.id).add(starterUnit.id);
+
+        // add buildings to game and maps
+        starterBuildings.forEach(sb => game.buildings.set(sb.id, sb));
+        starterBuildings.forEach(sb => {
+            // by player
+            if(!game.buildingsByPlayer.has(socket.id)){
+                game.buildingsByPlayer.set(socket.id, new Set());
+            }
+            game.buildingsByPlayer.get(socket.id).add(sb.id);
+
+            // by type
+            if(!game.buildingsByType.has(sb.type)){
+                game.buildingsByType.set(sb.type, new Set());
+            }
+            game.buildingsByType.get(sb.type).add(sb.id);
+        });
+
+        // calculate sight and position for units only for joining player
+        game.unitsByPlayer.get(socket.id).forEach((unitId) => {
+            const unit = game.units.get(unitId);
+            const calculatedSight = calculateSight(unit.x, unit.z);
+            const calculatedPosition = calculatePosition(unit.x, unit.z);
+
+            const player = game.players.get(socket.id);
+            calculatedSight.forEach(v => player.sight.add(v));
+            calculatedSight.forEach(v => player.discovered.add(v));
+
+            const tile = game.board.get(calculatedPosition);
+            if(tile) tile.unit = unit.id;
+
+            // update the unit object in the Map in-place
+            calculatedSight.forEach(v => unit.sight.add(v));
+            unit.position = calculatedPosition;
+
+            // optional
+            game.units.set(unitId, unit);
+        });
+
+        // calculate sight and position for buildings only for joining player
+        game.buildingsByPlayer.get(socket.id).forEach((buildingId)=>{
+            const building = game.buildings.get(buildingId);
+            const calculatedSight = calculateSight(building.x, building.z);
+            const calculatedPosition = calculatePosition(building.x, building.z);
+
+            const player = game.players.get(socket.id);
+            calculatedSight.forEach(v => player.sight.add(v));
+            calculatedSight.forEach(v => player.discovered.add(v));
+
+            const tile = game.board.get(calculatedPosition);
+            if(tile) tile.building = building.id;
+
+            // update the building object in the Map in-place
+            calculatedSight.forEach(v => building.sight.add(v));
+            building.position = calculatedPosition;
+
+            game.buildings.set(buildingId, building);
+        })
+
+        const safeGameData = { 
+            ...game,
+            units: Array.from(game.unitsByPlayer.get(socket.id)).map(id => {
+                const u = game.units.get(id);
+                return {
+                    ...u,
+                    sight: [...u.sight]
+                };
+            }),
+            buildings: Array.from(game.buildingsByPlayer.get(socket.id)).map(id => {
+                const b = game.buildings.get(id);
+                return {
+                    ...b,
+                    sight: [...b.sight]
+                };
+            }),
+            board: Array.from(game.board.values()),
+            player: { 
+                ...game.players.get(socket.id),
+                sight: [...game.players.get(socket.id).sight],
+                discovered: [...game.players.get(socket.id).discovered]
+            },
+        };
+        delete safeGameData.id;
+
+        socket.emit('starting-game-data', safeGameData);
+
     })
 
     socket.on('player-reconnect', ({ originalSocketId, gameRoom }) => {
@@ -1027,11 +1218,11 @@ io.on('connection', (socket) => {
                     sight: [...b.sight]
                 })),
                 board: Array.from(game.board.values()),
-                players: [{ 
+                player: { 
                     ...game.players.get(socket.id),
                     sight: [...game.players.get(socket.id).sight],
                     discovered: [...game.players.get(socket.id).discovered]
-                }],
+                },
             };
 
             socket.emit('starting-game-data', safeGameData);
@@ -1063,16 +1254,13 @@ io.on('connection', (socket) => {
         }
     })
 
-    // A socket requests movement
     socket.on('movement', (data)=>{
-        console.log(`socket ${socket.id} in room ${data.room} requested movement for unit ${data.unitId} to tile ${data.tileId}`);
-
         const game = gamesByRoom.get(data.room);
 
         if(game){
             const unit = game.units.get(data.unitId);
 
-            if(unit){
+            if(unit && unit.player === socket.id){
                 // if unit is already moving, remove any type: 'movement' actions from array
                 game.actions = game.actions.filter(action => !(action.type === 'movement' && action.unitId === data.unitId));
 
@@ -1145,7 +1333,7 @@ io.on('connection', (socket) => {
                     return;
                 }
 
-                if(unit){
+                if(unit && unit.player === socket.id){
                     game.actions.push({
                         id: randomUUID(),
                         type: data.actionType,
@@ -1161,7 +1349,7 @@ io.on('connection', (socket) => {
             } else {
                 const building = game.buildings.get(data.selected.id);
 
-                if(building){
+                if(building && building.player === socket.id){
                     game.actions.push({
                         id: randomUUID(),
                         type: data.actionType,

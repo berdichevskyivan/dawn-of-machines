@@ -1,11 +1,13 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import './Games.css'
 import { useEffect } from 'react';
 import { useState } from 'react';
 
 function Games({socket}) {
+  const navigate = useNavigate();
 
   const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     // we retrieve the games when we render this component (Games)
@@ -17,11 +19,25 @@ function Games({socket}) {
       setGames(data);
     })
 
-    // always remember to remove the 'on' WHEN the component is destroyed
+    socket.on('starting-game-data', (data) => {
+      localStorage.setItem('dom-player-socket', socket.id);
+      localStorage.setItem('dom-game-room', data.room);
+
+      setLoading(false);
+      navigate('/game-room', { state: { startingGameData: data } });
+    })
+
     return () => {
       socket.off('games-update');
+      socket.off('starting-game-data');
     }
   }, [])
+
+  const joinGame = (room) => {
+    // TODO: Add frontend and backend validation before player joins room
+    socket.emit('game-join', {room});
+    setLoading(true);
+  }
 
   return (
     <>
@@ -31,7 +47,7 @@ function Games({socket}) {
         { games.length > 0 && games.map((game, index)=>{ return (
           <div className="games-card" key={`game-${index}`}>
             <h1>{game.title}</h1>
-            <button>Join Game</button>
+            <button onClick={()=>{joinGame(game.room)}}>Join Game</button>
           </div>
         )})}
         </div>

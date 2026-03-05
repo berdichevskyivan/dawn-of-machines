@@ -453,7 +453,9 @@ function GameRoom({socket}){
 
     const [board, setBoard] = useState([]);
     const [units, setUnits] = useState([]);
+    const [discoveredUnits, setDiscoveredUnits] = useState([]);
     const [buildings, setBuildings] = useState([]);
+    const [discoveredBuildings, setDiscoveredBuildings] = useState([]);
     const [mapResources, setMapResources] = useState([]);
     const [resources, setResources] = useState(null);
     const [startingTime, setStartingTime] = useState(null);
@@ -541,17 +543,17 @@ function GameRoom({socket}){
             // Update localStorage with current socket
             localStorage.setItem('dom-player-socket', socket.id);
             localStorage.setItem('dom-game-room', data.room);
-
+            console.log(data);
             setBoard(data.board);
-            setUnits(data.units.filter(u => u.player === socket.id));
-            setBuildings(data.buildings.filter(b => b.player === socket.id));
-            setResources(data.players[0]?.resources);
+            setUnits(data.units);
+            setBuildings(data.buildings);
+            setResources(data.player.resources);
             setStartingTime(data.startingTime);
             startingTimeRef.current = data.startingTime;
             setGameRoom(data.room);
             setMapResources(data.resources);
-            setSight(data.players[0]?.sight);
-            setDiscovered(data.players[0]?.discovered);
+            setSight(data.player.sight);
+            setDiscovered(data.player.discovered);
         })
 
         // Handles player-update
@@ -592,6 +594,8 @@ function GameRoom({socket}){
         socket.on('sight-discovery-update', (data)=>{
             setSight(data.sight);
             setDiscovered(data.discovered);
+            setDiscoveredUnits(data.discoveredUnits);
+            setDiscoveredBuildings(data.discoveredBuildings);
         });
 
         socket.on('action-progress-update', (data) => {
@@ -646,15 +650,15 @@ function GameRoom({socket}){
         // The frontend ONLY receives THAT player's data. Not others.
         if (startingGameData) {
             setBoard(startingGameData.board);
-            setUnits(startingGameData.units.filter(u => u.player === socket.id));
-            setBuildings(startingGameData.buildings.filter(b => b.player === socket.id));
-            setResources(startingGameData.players[0]?.resources);
+            setUnits(startingGameData.units);
+            setBuildings(startingGameData.buildings);
+            setResources(startingGameData.player.resources);
             setStartingTime(startingGameData.startingTime);
             startingTimeRef.current = startingGameData.startingTime;
             setGameRoom(startingGameData.room);
             setMapResources(startingGameData.resources);
-            setSight(startingGameData.players[0]?.sight);
-            setDiscovered(startingGameData.players[0]?.discovered);
+            setSight(startingGameData.player.sight);
+            setDiscovered(startingGameData.player.discovered);
         }
 
         return () => {
@@ -686,6 +690,12 @@ function GameRoom({socket}){
 
     const visibleBuildings = useMemo(() => buildings.filter(b => sight?.includes(b.position)), [buildings, sight]);
     const buildingPositions = useMemo(() => visibleBuildings.map(b => [b.x - offsetX, 0, b.z - offsetZ]), [visibleBuildings, offsetX, offsetZ]);
+
+    const visibleDiscoveredUnits = useMemo(() => discoveredUnits.filter(u => u && sight?.includes(u.position)), [discoveredUnits, sight]);
+    const discoveredUnitPositions = useMemo(() => visibleDiscoveredUnits.map(u => [u.x - offsetX, 0, u.z - offsetZ]), [visibleDiscoveredUnits, offsetX, offsetZ]);
+
+    const visibleDiscoveredBuildings = useMemo(() => discoveredBuildings.filter(b => b && sight?.includes(b.position)), [discoveredBuildings, sight]);
+    const discoveredBuildingPositions = useMemo(() => visibleDiscoveredBuildings.map(b => [b.x - offsetX, 0, b.z - offsetZ]), [visibleDiscoveredBuildings, offsetX, offsetZ]);
 
     const visibleResources = useMemo(() => mapResources.filter(mr => sight?.includes(mr.position)), [mapResources, sight]);
     const resourcePositions = useMemo(() => visibleResources.map(r => [r.x - offsetX, 0, r.z - offsetZ]), [visibleResources, offsetX, offsetZ]);
@@ -795,7 +805,7 @@ function GameRoom({socket}){
             )}
 
             {/* Board */}
-            <Canvas>
+            <Canvas style={{position: 'static', width: '100%', height: '100%'}}>
                 {/* Camera and Controls (OrbitControls)*/}
                 <Camera mainControlsRef={mainControlsRef}/>
 
@@ -821,6 +831,22 @@ function GameRoom({socket}){
                     <>
                         <Building key={building.id} position={buildingPositions[i]} building={building} selectBuilding={selectBuilding}/>
                         { selected && selected.id === building.id && (<SelectionRing position={buildingPositions[i]} />)}
+                    </>
+                ))}
+
+                {/* Discovered Units */}
+                { visibleDiscoveredUnits.map((unit, i) => (
+                    <>
+                        <Unit key={unit.id} position={discoveredUnitPositions[i]} unit={unit} selectUnit={selectUnit} />
+                        { selected && selected.id === unit.id && (<SelectionRing position={unitPositions[i]} />)}
+                    </>
+                ))}
+
+                {/* Discovered Buildings */}
+                { visibleDiscoveredBuildings.map((building, i) => (
+                    <>
+                        <Building key={building.id} position={discoveredBuildingPositions[i]} building={building} selectBuilding={selectBuilding} />
+                        { selected && selected.id === building.id && (<SelectionRing position={discoveredBuildingPositions[i]} />)}
                     </>
                 ))}
 

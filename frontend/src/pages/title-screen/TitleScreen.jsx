@@ -3,22 +3,6 @@ import './TitleScreen.css'
 import { useState, useEffect } from 'react';
 
 function TitleScreenIcon() {
-  const [color, setColor] = useState('rgb(0, 255, 0)');
-
-  // Use to change colors or animate the icon
-  // to animate: change property, add transition on css
-  // useEffect(() => {
-  //   const colors = ['rgb(0, 255, 0)', 'rgb(0, 255, 255)', 'rgb(255, 215, 0)', 'rgb(128, 128, 175)'];
-  //   let index = 0;
-
-  //   const interval = setInterval(() => {
-  //     index = (index + 1) % colors.length;
-  //     setColor(colors[index]);
-  //   }, 500);
-
-  //   return () => clearInterval(interval);
-  // }, []);
-
   return (
     <svg width="100" height="100" viewBox="0 0 100 100">
       {/* Triangle with outline */}
@@ -26,7 +10,7 @@ function TitleScreenIcon() {
         className="title-screen-icon-triangle"
         points="50,0 0,86.6 100,86.6" 
         fill="black" 
-        stroke={color}
+        stroke="rgb(0, 255, 0)"
         strokeWidth="2" 
       />
 
@@ -37,13 +21,13 @@ function TitleScreenIcon() {
         </clipPath>
       </defs>
 
-      {/* Circle with dynamic color */}
+      {/* Circle */}
       <circle 
         className="title-screen-icon-circle"
         cx="50" 
         cy="86.6" 
         r="27.74" 
-        fill={color} 
+        fill="rgb(0, 255, 0)" 
         clipPath="url(#upperHalf)" 
       />
     </svg>
