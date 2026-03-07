@@ -18,10 +18,12 @@ let gamesByRoom = new Map();
 let gamesByStarted = new Map();
 let intervals = new Map();
 let sockets = new Map();
-const boardTemplate = new Map(Array.from({length: 100}, (_, i) => [i, { 
+const BOARD_SIZE = 32;
+const BOARD_TILES = BOARD_SIZE * BOARD_SIZE;
+const boardTemplate = new Map(Array.from({length: BOARD_TILES}, (_, i) => [i, { 
     id: i,
-    x: i % 10,
-    z: Math.floor(i / 10),
+    x: i % BOARD_SIZE,
+    z: Math.floor(i / BOARD_SIZE),
     resource: null,
     unit: null,
     building: null,
@@ -195,7 +197,7 @@ const createUnit = (type, overrides) => {
 
 const oppositeRound = x => Math.round(x) + (Math.round(x) > x ? -1 : (Math.round(x) < x ? 1 : 0));
 
-const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
+const calculateSight = (x, z, boardWidth = BOARD_SIZE, boardHeight = BOARD_SIZE) => {
     const deltas = [
         [0, 0],   // self
         [1, 0],   // right
@@ -222,7 +224,7 @@ const calculateSight = (x, z, boardWidth = 10, boardHeight = 10) => {
     return sightTileIds;
 };
 
-const calculatePosition = (x, z, boardWidth = 10) => {
+const calculatePosition = (x, z, boardWidth = BOARD_SIZE) => {
     if (x < 0 || x >= boardWidth || z < 0 || z >= boardWidth) return undefined;
     return z * boardWidth + x;
 }
