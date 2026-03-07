@@ -227,6 +227,52 @@ const calculatePosition = (x, z, boardWidth = 10) => {
     return z * boardWidth + x;
 }
 
+const computePlayersSight = (gameId) => {
+    const game = games.get(gameId);
+
+    if(game){
+        game.players.forEach((player, socketId) => {
+            const playerUnitIds = game.unitsByPlayer.get(socketId) || new Set();
+            const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id)).filter(Boolean);
+
+            const playerBuildingIds = game.buildingsByPlayer.get(socketId) || new Set();
+            const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id)).filter(Boolean);
+
+            player.sight = new Set([
+                ...playerUnits.flatMap(u => [...u.sight]),
+                ...playerBuildings.flatMap(b => [...b.sight]),
+            ]);
+
+            const discoveredUnits = [];
+            const discoveredBuildings = [];
+
+            player.sight.forEach((tileId) => {
+                const tile = game.board.get(tileId);
+                if(tile){
+                    if(tile.unit){
+                        const unit = game.units.get(tile.unit);
+                        if(unit && unit.player !== socketId) discoveredUnits.push({ ...unit, sight: [...unit.sight] });
+                    }
+                    if(tile.building){
+                        const building = game.buildings.get(tile.building);
+                        if(building && building.player !== socketId) discoveredBuildings.push({ ...building, sight: [...building.sight] });
+                    }
+                }
+            });
+
+            player.discovered = new Set([...player.discovered, ...player.sight]);
+
+            const playerSocket = sockets.get(socketId);
+            if(playerSocket) playerSocket.emit('sight-discovery-update', {
+                sight: [...player.sight],
+                discovered: [...player.discovered],
+                discoveredUnits,
+                discoveredBuildings,
+            });
+        });
+    }
+}
+
 const drainElectricity = (gameId) => {
     const game = games.get(gameId);
 
@@ -575,109 +621,58 @@ const resolveActions = (gameId) => {
                         playerSocket = sockets.get(action.playerId);
                         if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
                         break;
-                    case 'movement':
-                        unit = game.units.get(action.unitId);
-                        if(!unit) break;
+                        case 'movement':
+                            unit = game.units.get(action.unitId);
+                            if(!unit) break;
 
-                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                            progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                        unit.x = action.startX + (action.destinationX - action.startX) * progress;
-                        unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
-                        unit.isMoving = true;
+                            unit.x = action.startX + (action.destinationX - action.startX) * progress;
+                            unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                            unit.isMoving = true;
 
-                        const previousPosition = unit.position;
-                        unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+                            const previousPosition = unit.position;
+                            unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
 
-                        if(previousPosition !== unit.position){
-                            if(unit.position === undefined || unit.position === null) break;
-                            const previousPositionTile = game.board.get(previousPosition);
-                            if(previousPositionTile) previousPositionTile.unit = null;
-                            const newPositionTile = game.board.get(unit.position);
-                            if(newPositionTile) newPositionTile.unit = unit.id;
-                        }
-
-                        player = game.players.get(unit.player);
-
-                        if(player){
-                            if(progress >= 1){
-                                const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
-                                if(originTile && originTile.unit === unit.id) originTile.unit = null;
-
-                                const destPosition = calculatePosition(action.destinationX, action.destinationZ);
-                                const destTile = game.board.get(destPosition);
-                                if(destTile) destTile.unit = unit.id;
-
-                                unit.position = destPosition;
-                                unit.x = action.destinationX;
-                                unit.z = action.destinationZ;
-                                unit.isMoving = false;
-
-                                unit.sight = new Set([
-                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
-                                    destPosition,
-                                ]);
-                            } else {
-                                unit.sight = new Set([
-                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
-                                ]);
+                            if(previousPosition !== unit.position){
+                                if(unit.position === undefined || unit.position === null) break;
+                                const previousPositionTile = game.board.get(previousPosition);
+                                if(previousPositionTile) previousPositionTile.unit = null;
+                                const newPositionTile = game.board.get(unit.position);
+                                if(newPositionTile) newPositionTile.unit = unit.id;
                             }
 
-                            const playerUnitIds = game.unitsByPlayer.get(unit.player) || new Set();
-                            const playerUnits = Array.from(playerUnitIds)
-                                .map(id => game.units.get(id))
-                                .filter(Boolean);
+                            player = game.players.get(unit.player);
 
-                            const playerBuildingIds = game.buildingsByPlayer.get(unit.player) || new Set();
-                            const playerBuildings = Array.from(playerBuildingIds)
-                                .map(id => game.buildings.get(id))
-                                .filter(Boolean);
+                            if(player){
+                                if(progress >= 1){
+                                    const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
+                                    if(originTile && originTile.unit === unit.id) originTile.unit = null;
 
-                            player.sight = new Set([
-                                ...playerUnits.flatMap(u => [...u.sight]),
-                                ...playerBuildings.flatMap(b => [...b.sight]),
-                            ]);
+                                    const destPosition = calculatePosition(action.destinationX, action.destinationZ);
+                                    const destTile = game.board.get(destPosition);
+                                    if(destTile) destTile.unit = unit.id;
 
-                            // once i have the player sight i can determine which units, buildings and resources are in his sight
-                            // by checking the tiles
-                            // then, we will send this data in the sight-discovery-update that already exists
-                            // for now, do so with units and buildings so we can see other players units and buildings
+                                    unit.position = destPosition;
+                                    unit.x = action.destinationX;
+                                    unit.z = action.destinationZ;
+                                    unit.isMoving = false;
 
-                            const discoveredUnits = [];
-                            const discoveredBuildings = [];
-                            player.sight.forEach((tileId)=>{
-                                const tile = game.board.get(tileId);
-                                if(tile){
-                                    // calculate units in sight
-                                    if(tile.unit){
-                                        const unit = game.units.get(tile.unit);
-                                        discoveredUnits.push(unit);
-                                    }
-                                    // calculate buildings in sight
-                                    if(tile.building){
-                                        const building = game.buildings.get(tile.buildings);
-                                        discoveredBuildings.push(building);
-                                    }
+                                    unit.sight = new Set([
+                                        ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                        ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
+                                        destPosition,
+                                    ]);
+                                } else {
+                                    unit.sight = new Set([
+                                        ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                        ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
+                                    ]);
                                 }
-                            })
-
-                            player.discovered = new Set([...player.discovered, ...unit.sight]);
-
-                            playerSocket = sockets.get(action.playerId);
-
-                            if(playerSocket){
-                                playerSocket.emit('sight-discovery-update', {
-                                    sight: [...player.sight],
-                                    discovered: [...player.discovered],
-                                    discoveredUnits,
-                                    discoveredBuildings,
-                                })
                             }
-                        }
 
-                        io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
-                        break;
+                            io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
+                            break;
                     case 'refine-iron':
                         refineResource(game, action);
                         break;
@@ -938,8 +933,12 @@ io.on('connection', (socket) => {
         });
 
         const mainInterval = setInterval(()=>{
+            // Electricity functions
             drainElectricity(game.id);
             generateElectricity(game.id);
+
+            // Check for discovered units and buildings in players sight
+            computePlayersSight(game.id);
 
             if(game.actions.length > 0){
                 resolveActions(game.id);
