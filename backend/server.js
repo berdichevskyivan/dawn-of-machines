@@ -129,7 +129,6 @@ const buildingsMap = {
         mobile: false,
         name: 'Assembly Plant',
         type: 'assembly-plant',
-        sight: new Set(),
         integrity: 100,
         material: 'iron',
         actions: [
@@ -144,7 +143,6 @@ const buildingsMap = {
         mobile: false,
         name: 'Refinery',
         type: 'refinery',
-        sight: new Set(),
         integrity: 100,
         material: 'iron',
         actions: [
@@ -156,24 +154,44 @@ const buildingsMap = {
         mobile: false,
         name: 'Generator',
         type: 'generator',
-        sight: new Set(),
         integrity: 100,
         material: 'iron',
         actions: [],
     }
 }
 
-const playerMap = {
-    resources: {
-        iron: 10,
-        steel: 0,
-        carbon: 0,
-        graphene: 0,
-        electricity: 100
-    },
-    sight: new Set(),
-    discovered: new Set(),
-}
+const createPlayer = (overrides) => {
+    return {
+        resources: {
+            iron: 10,
+            steel: 0,
+            carbon: 0,
+            graphene: 0,
+            electricity: 100
+        },
+        sight: new Set(),
+        discovered: new Set(),
+        ...overrides,
+    }
+};
+
+const createBuilding = (type, overrides) => {
+    return {
+        ...buildingsMap[type],
+        sight: new Set(),
+        actions: [...buildingsMap[type].actions],
+        ...overrides,
+    }
+};
+
+const createUnit = (type, overrides) => {
+    return {
+        ...unitsMap[type],
+        sight: new Set(),
+        actions: [...unitsMap[type].actions],
+        ...overrides,
+    }
+};
 
 const oppositeRound = x => Math.round(x) + (Math.round(x) > x ? -1 : (Math.round(x) < x ? 1 : 0));
 
@@ -354,8 +372,7 @@ const buildBuilding = (game, action) => {
 
         switch(buildingType){
             case 'assembly-plant':
-                building = {
-                    ...buildingsMap['assembly-plant'],
+                building = createBuilding('assembly-plant', {
                     id: randomUUID(),
                     hackId: randomUUID(),
                     player: action.playerId,
@@ -363,11 +380,10 @@ const buildBuilding = (game, action) => {
                     x: unit.x,
                     z: unit.z+1,
                     position: calculatePosition(unit.x, unit.z+1),
-                };
+                });
                 break;
             case 'generator':
-                building = {
-                    ...buildingsMap['generator'],
+                building = createBuilding('generator', {
                     id: randomUUID(),
                     hackId: randomUUID(),
                     player: action.playerId,
@@ -375,11 +391,10 @@ const buildBuilding = (game, action) => {
                     x: unit.x,
                     z: unit.z+1,
                     position: calculatePosition(unit.x, unit.z+1),
-                };
+                });
                 break;
             case 'refinery':
-                building = {
-                    ...buildingsMap['refinery'],
+                building = createBuilding('refinery', {
                     id: randomUUID(),
                     hackId: randomUUID(),
                     player: action.playerId,
@@ -387,7 +402,7 @@ const buildBuilding = (game, action) => {
                     x: unit.x,
                     z: unit.z+1,
                     position: calculatePosition(unit.x, unit.z+1),
-                };
+                });
                 break;
         }
 
@@ -468,8 +483,7 @@ const resolveActions = (gameId) => {
 
                     switch(nodeType){
                         case 'gather-node':
-                            node = {
-                                ...unitsMap['gather-node'],
+                            node = createUnit('gather-node', {
                                 id: randomUUID(),
                                 hackId: randomUUID(),
                                 player: action.playerId,
@@ -477,11 +491,10 @@ const resolveActions = (gameId) => {
                                 x: building.x,
                                 z: building.z+1,
                                 position: calculatePosition(building.x, building.z+1),
-                            }
+                            });
                             break;
                         case 'builder-node':
-                            node = {
-                                ...unitsMap['builder-node'],
+                            node = createUnit('builder-node', {
                                 id: randomUUID(),
                                 hackId: randomUUID(),
                                 player: action.playerId,
@@ -489,11 +502,10 @@ const resolveActions = (gameId) => {
                                 x: building.x,
                                 z: building.z+1,
                                 position: calculatePosition(building.x, building.z+1),
-                            }
+                            });
                             break;
                         case 'scanner-node':
-                            node = {
-                                ...unitsMap['scanner-node'],
+                            node = createUnit('scanner-node', {
                                 id: randomUUID(),
                                 hackId: randomUUID(),
                                 player: action.playerId,
@@ -501,11 +513,10 @@ const resolveActions = (gameId) => {
                                 x: building.x,
                                 z: building.z+1,
                                 position: calculatePosition(building.x, building.z+1),
-                            }
+                            });
                             break;
                         case 'combat-node':
-                            node = {
-                                ...unitsMap['combat-node'],
+                            node = createUnit('combat-node', {
                                 id: randomUUID(),
                                 hackId: randomUUID(),
                                 player: action.playerId,
@@ -513,11 +524,10 @@ const resolveActions = (gameId) => {
                                 x: building.x,
                                 z: building.z+1,
                                 position: calculatePosition(building.x, building.z+1),
-                            }
+                            });
                             break;
                         case 'hacker-node':
-                            node = {
-                                ...unitsMap['hacker-node'],
+                            node = createUnit('hacker-node', {
                                 id: randomUUID(),
                                 hackId: randomUUID(),
                                 player: action.playerId,
@@ -525,7 +535,7 @@ const resolveActions = (gameId) => {
                                 x: building.x,
                                 z: building.z+1,
                                 position: calculatePosition(building.x, building.z+1),
-                            }
+                            });
                             break;
                     }
 
@@ -785,13 +795,7 @@ io.on('connection', (socket) => {
             startingTime: Date.now(),
             startingSocketId: socket.id,
             actions: [],
-            players: new Map([
-                [socket.id, {
-                    name: 'Player 1',
-                    startedGame: true,
-                    ...playerMap,
-                }]
-            ]),
+            players: new Map([[socket.id, createPlayer({name: 'Player 1',startedGame: true})]]),
             board: new Map(boardTemplate),
             resources: [
                 {
@@ -824,47 +828,42 @@ io.on('connection', (socket) => {
 
         // TODO: Add efficiency.
         // Units can perform all actions, but they have different efficiency mapping.
-        const starterUnit = {
-            ...unitsMap['gather-node'],
+        const starterUnit = createUnit('gather-node',{
             id: randomUUID(),
             hackId: randomUUID(),
             player: socket.id,
-            sight: new Set(),
             x: 0,
             z: 0,
             position: null,
-        };
+        });
 
         game.units.set(starterUnit.id, starterUnit);
 
         const starterBuildings = [
-            {
-                ...buildingsMap['assembly-plant'],
+            createBuilding('assembly-plant',{
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 1,
                 z: 1,
                 position: null,
-            },
-            {
-                ...buildingsMap['generator'],
+            }),
+            createBuilding('generator',{
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 2,
                 z: 2,
                 position: null,
-            },
-            {
-                ...buildingsMap['refinery'],
+            }),
+            createBuilding('refinery',{
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 3,
                 z: 3,
                 position: null,
-            },
+            }),
         ];
 
         starterBuildings.forEach(sb => game.buildings.set(sb.id, sb));
@@ -998,54 +997,43 @@ io.on('connection', (socket) => {
         console.log(`player ${socket.id} has joined room ${room}`);
 
         // add new player to game.players
-        game.players.set(socket.id, {
-            name: `Player ${game.players.size+1}`,
-            startedGame: false,
-            ...playerMap,
-        })
+        game.players.set(socket.id, createPlayer({name: `Player ${game.players.size+1}`, startedGame: false}));
 
-        // ok we now have the game, we need to put that player in the game
-        // the player is essentially the socket id so we have all we need here
-        // prepare starter units and buildings
-        const starterUnit = {
-            ...unitsMap['gather-node'],
+        // add starterUnit for joining player
+        const starterUnit = createUnit('gather-node', {
             id: randomUUID(),
             hackId: randomUUID(),
             player: socket.id,
-            sight: new Set(),
             x: 9,
-            z: 9, // other end of the board for now
+            z: 9,
             position: null,
-        };
+        });
 
         const starterBuildings = [
-            {
-                ...buildingsMap['assembly-plant'],
+            createBuilding('assembly-plant', {
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 8,
                 z: 8,
                 position: null,
-            },
-            {
-                ...buildingsMap['generator'],
+            }),
+            createBuilding('generator', {
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 8,
                 z: 7,
                 position: null,
-            },
-            {
-                ...buildingsMap['refinery'],
+            }),
+            createBuilding('refinery', {
                 id: randomUUID(),
                 hackId: randomUUID(),
                 player: socket.id,
                 x: 8,
                 z: 6,
                 position: null,
-            },
+            }),
         ];
 
         // add units to game and maps

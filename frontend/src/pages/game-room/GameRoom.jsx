@@ -543,7 +543,7 @@ function GameRoom({socket}){
             // Update localStorage with current socket
             localStorage.setItem('dom-player-socket', socket.id);
             localStorage.setItem('dom-game-room', data.room);
-            console.log(data);
+
             setBoard(data.board);
             setUnits(data.units);
             setBuildings(data.buildings);
