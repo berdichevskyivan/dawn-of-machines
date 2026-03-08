@@ -293,17 +293,24 @@ const actionIconsMap = {
     'attack': <AttackIcon color="#FF0000" type="attack" size={50} />,
 }
 
-function Camera({mainControlsRef}) {
+function Camera({ mainControlsRef, target }) {
   const { camera } = useThree();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    camera.position.set(0, 7, 7); // x,y,z where the point is the center of the camera
+    if (!target || initialized.current) return;
+
+    const [x, z] = target;
+
+    camera.position.set(x, 8, z + 8);
 
     if (mainControlsRef.current) {
-      mainControlsRef.current.target.set(0, -4, 0); // x,y,z where the point is the target
+      mainControlsRef.current.target.set(x, 0, z);
       mainControlsRef.current.update();
     }
-  }, [camera]);
+
+    initialized.current = true;
+  }, [camera, target]);
 
   return <OrbitControls ref={mainControlsRef} camera={camera} />;
 }
@@ -700,6 +707,7 @@ function GameRoom({socket}){
     const visibleResources = useMemo(() => mapResources.filter(mr => sight?.includes(mr.position)), [mapResources, sight]);
     const resourcePositions = useMemo(() => visibleResources.map(r => [r.x - offsetX, 0, r.z - offsetZ]), [visibleResources, offsetX, offsetZ]);
 
+    const assemblyPlant = visibleBuildings.find(b => b.type === "assembly-plant");
     return (
         <div className="game-room-container">
             { resources && (
@@ -807,7 +815,10 @@ function GameRoom({socket}){
             {/* Board */}
             <Canvas style={{position: 'static', width: '100%', height: '100%'}}>
                 {/* Camera and Controls (OrbitControls)*/}
-                <Camera mainControlsRef={mainControlsRef}/>
+                <Camera 
+                    mainControlsRef={mainControlsRef}
+                    target={assemblyPlant ? [assemblyPlant.x - offsetX, assemblyPlant.z - offsetZ] : null}
+                />
 
                 {/* Lights */}
                 <ambientLight intensity={Math.PI / 2} />

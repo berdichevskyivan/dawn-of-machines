@@ -173,6 +173,7 @@ const createPlayer = (overrides) => {
         },
         sight: new Set(),
         discovered: new Set(),
+        hackIds: new Set(),
         ...overrides,
     }
 };
@@ -180,6 +181,8 @@ const createPlayer = (overrides) => {
 const createBuilding = (type, overrides) => {
     return {
         ...buildingsMap[type],
+        id: randomUUID(),
+        hackId: randomUUID(),
         sight: new Set(),
         actions: [...buildingsMap[type].actions],
         ...overrides,
@@ -189,6 +192,8 @@ const createBuilding = (type, overrides) => {
 const createUnit = (type, overrides) => {
     return {
         ...unitsMap[type],
+        id: randomUUID(),
+        hackId: randomUUID(),
         sight: new Set(),
         actions: [...unitsMap[type].actions],
         ...overrides,
@@ -623,58 +628,58 @@ const resolveActions = (gameId) => {
                         playerSocket = sockets.get(action.playerId);
                         if(playerSocket) playerSocket.emit('logs-update', { log: '[FATAL] Electricity dropped below 10.' });
                         break;
-                        case 'movement':
-                            unit = game.units.get(action.unitId);
-                            if(!unit) break;
+                    case 'movement':
+                        unit = game.units.get(action.unitId);
+                        if(!unit) break;
 
-                            progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
-                            unit.x = action.startX + (action.destinationX - action.startX) * progress;
-                            unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
-                            unit.isMoving = true;
+                        unit.x = action.startX + (action.destinationX - action.startX) * progress;
+                        unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
+                        unit.isMoving = true;
 
-                            const previousPosition = unit.position;
-                            unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+                        const previousPosition = unit.position;
+                        unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
 
-                            if(previousPosition !== unit.position){
-                                if(unit.position === undefined || unit.position === null) break;
-                                const previousPositionTile = game.board.get(previousPosition);
-                                if(previousPositionTile) previousPositionTile.unit = null;
-                                const newPositionTile = game.board.get(unit.position);
-                                if(newPositionTile) newPositionTile.unit = unit.id;
+                        if(previousPosition !== unit.position){
+                            if(unit.position === undefined || unit.position === null) break;
+                            const previousPositionTile = game.board.get(previousPosition);
+                            if(previousPositionTile) previousPositionTile.unit = null;
+                            const newPositionTile = game.board.get(unit.position);
+                            if(newPositionTile) newPositionTile.unit = unit.id;
+                        }
+
+                        player = game.players.get(unit.player);
+
+                        if(player){
+                            if(progress >= 1){
+                                const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
+                                if(originTile && originTile.unit === unit.id) originTile.unit = null;
+
+                                const destPosition = calculatePosition(action.destinationX, action.destinationZ);
+                                const destTile = game.board.get(destPosition);
+                                if(destTile) destTile.unit = unit.id;
+
+                                unit.position = destPosition;
+                                unit.x = action.destinationX;
+                                unit.z = action.destinationZ;
+                                unit.isMoving = false;
+
+                                unit.sight = new Set([
+                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
+                                    destPosition,
+                                ]);
+                            } else {
+                                unit.sight = new Set([
+                                    ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
+                                    ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
+                                ]);
                             }
+                        }
 
-                            player = game.players.get(unit.player);
-
-                            if(player){
-                                if(progress >= 1){
-                                    const originTile = game.board.get(calculatePosition(action.startX, action.startZ));
-                                    if(originTile && originTile.unit === unit.id) originTile.unit = null;
-
-                                    const destPosition = calculatePosition(action.destinationX, action.destinationZ);
-                                    const destTile = game.board.get(destPosition);
-                                    if(destTile) destTile.unit = unit.id;
-
-                                    unit.position = destPosition;
-                                    unit.x = action.destinationX;
-                                    unit.z = action.destinationZ;
-                                    unit.isMoving = false;
-
-                                    unit.sight = new Set([
-                                        ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                        ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z)),
-                                        destPosition,
-                                    ]);
-                                } else {
-                                    unit.sight = new Set([
-                                        ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
-                                        ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
-                                    ]);
-                                }
-                            }
-
-                            io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
-                            break;
+                        io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
+                        break;
                     case 'refine-iron':
                         refineResource(game, action);
                         break;
@@ -731,6 +736,182 @@ const resolveActions = (gameId) => {
                             playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
                         } 
                         io.to(game.room).emit('resources-update', game.resources);
+                        break;
+                    case 'scan':
+                        unit = game.units.get(action.unitId);
+                        if (!unit) break;
+
+                        player = game.players.get(unit.player);
+                        playerSocket = sockets.get(action.playerId);
+
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                        action.costPaid.forEach(cost => {
+                            const targetPaid = cost.amount * progress;
+                            const delta = targetPaid - cost.amountPaid;
+                            if (delta > 0) {
+                                if (player.resources[cost.resource] >= delta) {
+                                    player.resources[cost.resource] -= delta;
+                                    cost.amountPaid += delta;
+                                } else {
+                                    action.paused = true;
+                                }
+                            }
+                        });
+
+                        tickProgress = progress - (action.lastProgress || 0);
+                        action.lastProgress = progress;
+
+                        if(progress >= 1){
+                            unit.sight.forEach(tileId => {
+                                if(tileId === unit.position) return;
+                                const tile = game.board.get(tileId);
+                                if (tile && tile.unit) {
+                                    const unit = game.units.get(tile.unit);
+                                    if (unit) {
+                                        player.hackIds.add(unit.hackId);
+                                        if(playerSocket) playerSocket.emit('logs-update', { log: `hackId ${unit.hackId} from ${unit.name} has been acquired.` });
+                                    }
+                                }
+                                if (tile && tile.building){
+                                    const building = game.buildings.get(tile.building);
+                                    if (building) {
+                                        player.hackIds.add(building.hackId);
+                                        if(playerSocket) playerSocket.emit('logs-update', { log: `hackId ${building.hackId} from ${building.name} has been acquired.` });
+                                    }
+                                }
+                            });
+                        }
+                        if (playerSocket){
+                            playerSocket.emit('player-update', { playerData: player });
+                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
+                        };
+                        break;
+                    case 'hack':
+                        unit = game.units.get(action.unitId);
+                        if (!unit) break;
+
+                        player = game.players.get(unit.player);
+                        playerSocket = sockets.get(action.playerId);
+
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                        action.costPaid.forEach(cost => {
+                            const targetPaid = cost.amount * progress;
+                            const delta = targetPaid - cost.amountPaid;
+                            if (delta > 0) {
+                                if (player.resources[cost.resource] >= delta) {
+                                    player.resources[cost.resource] -= delta;
+                                    cost.amountPaid += delta;
+                                } else {
+                                    action.paused = true;
+                                }
+                            }
+                        });
+
+                        tickProgress = progress - (action.lastProgress || 0);
+                        action.lastProgress = progress;
+
+                        if(progress >= 1){
+                            unit.sight.forEach(tileId => {
+                                if(tileId === unit.position) return;
+                                const tile = game.board.get(tileId);
+                                if (tile && tile.unit) {
+                                    const unit = game.units.get(tile.unit);
+                                    // Validate if the player has the hackId of that unit
+                                    if (unit && player.hackIds.has(unit.hackId)) {
+                                        unit.player = action.playerId;
+                                        if(playerSocket){
+                                            const playerUnitIds = game.unitsByPlayer.get(action.playerId) || new Set();
+                                            const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id));
+                                            playerSocket.emit('player-units-update', { 
+                                                units: playerUnits.map(u => ({ ...u, sight: [...u.sight] }))
+                                            });
+                                            playerSocket.emit('logs-update', { log: `${unit.name} has been acquired.` });
+                                        } 
+                                    }else{
+                                        if(playerSocket) playerSocket.emit('logs-update', { log: `hackId of ${unit.name} is required.` });
+                                    }
+                                }
+                                if (tile && tile.building){
+                                    const building = game.buildings.get(tile.building);
+                                    if (building && player.hackIds.has(building.hackId)) {
+                                        building.player = action.playerId;
+                                        if(playerSocket){
+                                            const playerBuildingIds = game.buildingsByPlayer.get(action.playerId) || new Set();
+                                            const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id));
+                                            playerSocket.emit('player-buildings-update', { 
+                                                buildings: playerBuildings.map(b => ({ ...b, sight: [...b.sight] }))
+                                            });
+                                            playerSocket.emit('logs-update', { log: `${building.name} has been acquired.` });
+                                        } 
+                                    }else{
+                                        if(playerSocket) playerSocket.emit('logs-update', { log: `hackId of ${building.name} is required.` });
+                                    }
+                                }
+                            });
+                        }
+
+                        if (playerSocket){
+                            playerSocket.emit('player-update', { playerData: player });
+                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
+                        } 
+                        break;
+                    case 'attack':
+                        let attackingUnit = game.units.get(action.unitId);
+                        if (!attackingUnit) break;
+
+                        player = game.players.get(attackingUnit.player);
+                        playerSocket = sockets.get(action.playerId);
+                        let attackedSocket = null;
+
+                        progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
+
+                        action.costPaid.forEach(cost => {
+                            const targetPaid = cost.amount * progress;
+                            const delta = targetPaid - cost.amountPaid;
+                            if (delta > 0) {
+                                if (player.resources[cost.resource] >= delta) {
+                                    player.resources[cost.resource] -= delta;
+                                    cost.amountPaid += delta;
+                                } else {
+                                    action.paused = true;
+                                }
+                            }
+                        });
+
+                        tickProgress = progress - (action.lastProgress || 0);
+                        action.lastProgress = progress;
+
+                        attackingUnit.sight.forEach(tileId => {
+                            const tile = game.board.get(tileId);
+                            if (tile && tile.unit) {
+                                // decrease integrity of unit in sight
+                                const unit = game.units.get(tile.unit);
+                                if (unit) {
+                                    const damage = Math.min(tickProgress, unit.integrity);
+                                    unit.integrity -= damage;
+                                    if(playerSocket) playerSocket.emit('logs-update', { log: `${unit.name} integrity decreased by ${damage}.` });
+                                    attackedSocket = sockets.get(unit.player);
+                                    if(attackedSocket) attackedSocket.emit('logs-update', { log: `${attackingUnit.name} has attacked ${unit.name}.` })
+                                }
+                            }
+                            if (tile && tile.building){
+                                const building = game.buildings.get(tile.building);
+                                if (building) {
+                                    const damage = Math.min(tickProgress, building.integrity);
+                                    building.integrity -= damage;
+                                    if(playerSocket) playerSocket.emit('logs-update', { log: `${building.name} integrity decreased by ${damage}.` });
+                                    attackedSocket = sockets.get(building.player);
+                                    if(attackedSocket) attackedSocket.emit('logs-update', { log: `${attackingUnit.name} has attacked ${building.name}.` })
+                                }
+                            }
+                        });
+
+                        if (playerSocket){
+                            playerSocket.emit('player-update', { playerData: player });
+                            playerSocket.emit('action-progress-update', { actionId: action.id, progress: progress, actionType: action.type });
+                        } 
                         break;
                 }
             }
