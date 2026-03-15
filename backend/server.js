@@ -277,7 +277,7 @@ const computeDiscovered = (game, socketId) => {
     });
 }
 
-const drainElectricity = (gameId) => {
+const computeElectricity = (gameId) => {
     const game = games.get(gameId);
 
     if(game){
@@ -292,7 +292,6 @@ const drainElectricity = (gameId) => {
             else if(player.resources.electricity <= 25) newThreshold = 'critical';
             else if(player.resources.electricity <= 50) newThreshold = 'alert';
 
-            // Only push a new action if the threshold just changed
             if(newThreshold !== player.thresholdState){
                 player.thresholdState = newThreshold;
 
@@ -308,9 +307,8 @@ const drainElectricity = (gameId) => {
                 }
             }
 
-            // if player started the game and electricity equals zero, halt everything, disconnect the game
+            // Losing condition
             if(player.startedGame && player.resources.electricity <= 0){
-                // immediately delete all actions
                 game.actions = []
 
                 const playerSocket = sockets.get(socketId);
@@ -320,24 +318,10 @@ const drainElectricity = (gameId) => {
                 } 
             }
 
-            // check in the array of actions for actions belonging to THIS player
             player.resources.electricity -= game.actions.filter(action => action.playerId === socketId && action.drainsElectricity).length * 0.2;
 
-            const playerSocket = sockets.get(socketId);
-            if (playerSocket) playerSocket.emit('player-update', { playerData: player });
-        })
-    }
-}
-
-const generateElectricity = (gameId) => {
-    const game = games.get(gameId);
-
-    if(game){
-        game.players.forEach((player, socketId) => {
-            // get the generator IDs from buildingsByType Map
+            // Generate electricity
             const generatorIds = game.buildingsByType.get('generator') || new Set();
-
-            // map IDs to building objects
             const playerGenerators = Array.from(generatorIds)
                 .map(id => game.buildings.get(id))
                 .filter(b => b && b.player === socketId);  // keep only this player's generators
@@ -710,7 +694,11 @@ const resolveActions = (gameId) => {
                             }
                         }
 
-                        io.to(game.room).emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving })
+                        game.players.forEach((player, watcherSocketId) => {
+                            if(!player.sight.has(unit.position)) return;
+                            const watcherSocket = sockets.get(watcherSocketId);
+                            if(watcherSocket) watcherSocket.emit('movement-update', { unitId: unit.id, x: unit.x, z: unit.z, sight: [...unit.sight], isMoving: unit.isMoving });
+                        });
                         break;
                     case 'refine-iron':
                         refineResource(game, action);
@@ -1152,9 +1140,7 @@ io.on('connection', (socket) => {
         });
 
         const mainInterval = setInterval(()=>{
-            drainElectricity(game.id);
-            generateElectricity(game.id);
-
+            computeElectricity(game.id);
             if(game.actions.length > 0){
                 resolveActions(game.id);
             }
