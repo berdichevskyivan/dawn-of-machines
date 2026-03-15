@@ -234,50 +234,47 @@ const calculatePosition = (x, z, boardWidth = BOARD_SIZE) => {
     return z * boardWidth + x;
 }
 
-const computePlayersSight = (gameId) => {
-    const game = games.get(gameId);
+const computeDiscovered = (game, socketId) => {
+    const player = game.players.get(socketId);
+    if(!player) return;
 
-    if(game){
-        game.players.forEach((player, socketId) => {
-            const playerUnitIds = game.unitsByPlayer.get(socketId) || new Set();
-            const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id)).filter(Boolean);
+    const playerUnitIds = game.unitsByPlayer.get(socketId) || new Set();
+    const playerUnits = Array.from(playerUnitIds).map(id => game.units.get(id)).filter(Boolean);
 
-            const playerBuildingIds = game.buildingsByPlayer.get(socketId) || new Set();
-            const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id)).filter(Boolean);
+    const playerBuildingIds = game.buildingsByPlayer.get(socketId) || new Set();
+    const playerBuildings = Array.from(playerBuildingIds).map(id => game.buildings.get(id)).filter(Boolean);
 
-            player.sight = new Set([
-                ...playerUnits.flatMap(u => [...u.sight]),
-                ...playerBuildings.flatMap(b => [...b.sight]),
-            ]);
+    player.sight = new Set([
+        ...playerUnits.flatMap(u => [...u.sight]),
+        ...playerBuildings.flatMap(b => [...b.sight]),
+    ]);
 
-            const discoveredUnits = [];
-            const discoveredBuildings = [];
+    const discoveredUnits = [];
+    const discoveredBuildings = [];
 
-            player.sight.forEach((tileId) => {
-                const tile = game.board.get(tileId);
-                if(tile){
-                    if(tile.unit){
-                        const unit = game.units.get(tile.unit);
-                        if(unit && unit.player !== socketId) discoveredUnits.push({ ...unit, sight: [...unit.sight] });
-                    }
-                    if(tile.building){
-                        const building = game.buildings.get(tile.building);
-                        if(building && building.player !== socketId) discoveredBuildings.push({ ...building, sight: [...building.sight] });
-                    }
-                }
-            });
+    player.sight.forEach((tileId) => {
+        const tile = game.board.get(tileId);
+        if(tile){
+            if(tile.unit){
+                const unit = game.units.get(tile.unit);
+                if(unit && unit.player !== socketId) discoveredUnits.push({ ...unit, sight: [...unit.sight] });
+            }
+            if(tile.building){
+                const building = game.buildings.get(tile.building);
+                if(building && building.player !== socketId) discoveredBuildings.push({ ...building, sight: [...building.sight] });
+            }
+        }
+    });
 
-            player.discovered = new Set([...player.discovered, ...player.sight]);
+    player.discovered = new Set([...player.discovered, ...player.sight]);
 
-            const playerSocket = sockets.get(socketId);
-            if(playerSocket) playerSocket.emit('sight-discovery-update', {
-                sight: [...player.sight],
-                discovered: [...player.discovered],
-                discoveredUnits,
-                discoveredBuildings,
-            });
-        });
-    }
+    const playerSocket = sockets.get(socketId);
+    if(playerSocket) playerSocket.emit('sight-discovery-update', {
+        sight: [...player.sight],
+        discovered: [...player.discovered],
+        discoveredUnits,
+        discoveredBuildings,
+    });
 }
 
 const drainElectricity = (gameId) => {
@@ -634,12 +631,17 @@ const resolveActions = (gameId) => {
 
                         progress = Math.min((Date.now() - action.startingTime) / action.duration, 1);
 
+                        const prevX = Math.round(unit.x);
+                        const prevZ = Math.round(unit.z);
+                        const previousPosition = unit.position;
+                        const previousSight = new Set(calculateSight(prevX, prevZ));
+
                         unit.x = action.startX + (action.destinationX - action.startX) * progress;
                         unit.z = action.startZ + (action.destinationZ - action.startZ) * progress;
                         unit.isMoving = true;
-
-                        const previousPosition = unit.position;
                         unit.position = calculatePosition(Math.round(unit.x), Math.round(unit.z));
+
+                        const currentSight = new Set(calculateSight(Math.round(unit.x), Math.round(unit.z)));
 
                         if(previousPosition !== unit.position){
                             if(unit.position === undefined || unit.position === null) break;
@@ -647,6 +649,26 @@ const resolveActions = (gameId) => {
                             if(previousPositionTile) previousPositionTile.unit = null;
                             const newPositionTile = game.board.get(unit.position);
                             if(newPositionTile) newPositionTile.unit = unit.id;
+
+                            for(const tileId of previousSight){
+                                if(!currentSight.has(tileId)){
+                                    game.tileWatchers.get(tileId).delete(unit.player);
+                                    // previous watchers get notified when unit leaves sight
+                                    const previousWatchers = game.tileWatchers.get(tileId);
+                                    if(previousWatchers){
+                                        for(const watcherSocketId of previousWatchers){
+                                            if(watcherSocketId === unit.player) continue;
+                                            computeDiscovered(game, watcherSocketId);
+                                        }
+                                    }
+                                } 
+                            }
+
+                            for(const tileId of currentSight){
+                                if(!previousSight.has(tileId)) game.tileWatchers.get(tileId).add(unit.player);
+                            }
+
+                            computeDiscovered(game, unit.player);
                         }
 
                         player = game.players.get(unit.player);
@@ -675,6 +697,16 @@ const resolveActions = (gameId) => {
                                     ...calculateSight(Math.round(unit.x), Math.round(unit.z)),
                                     ...calculateSight(oppositeRound(unit.x), oppositeRound(unit.z))
                                 ]);
+                            }
+                        }
+
+                        for(const tileId of currentSight){
+                            const watchers = game.tileWatchers.get(tileId);
+                            if(watchers){
+                                for(const watcherSocketId of watchers){
+                                    if(watcherSocketId === unit.player) continue;
+                                    computeDiscovered(game, watcherSocketId);
+                                }
                             }
                         }
 
@@ -1002,6 +1034,7 @@ io.on('connection', (socket) => {
             buildings: new Map(),
             buildingsByPlayer: new Map(),
             buildingsByType: new Map(),
+            tileWatchers: new Map(Array.from({length: BOARD_TILES}, (_, i) => [i, new Set()])),
         };
 
         // TODO: Add efficiency.
@@ -1066,7 +1099,7 @@ io.on('connection', (socket) => {
             game.buildingsByType.get(sb.type).add(sb.id);
         });
 
-        game.units.forEach((u, unitId) => {
+        game.units.forEach(u => {
             const calculatedSight = calculateSight(u.x, u.z);
             const calculatedPosition = calculatePosition(u.x, u.z);
 
@@ -1077,15 +1110,16 @@ io.on('connection', (socket) => {
             const tile = game.board.get(calculatedPosition);
             if(tile) tile.unit = u.id;
 
-            // update the unit object in the Map in-place
             calculatedSight.forEach(v => u.sight.add(v));
             u.position = calculatedPosition;
 
-            // optional
-            game.units.set(unitId, u);
+            // update tileWatchers
+            calculatedSight.forEach(tileId => {
+                game.tileWatchers.get(tileId).add(socket.id);
+            })
         });
 
-        game.buildings.forEach((b, buildingId) => {
+        game.buildings.forEach(b => {
             const calculatedSight = calculateSight(b.x, b.z);
             const calculatedPosition = calculatePosition(b.x, b.z);
 
@@ -1096,11 +1130,13 @@ io.on('connection', (socket) => {
             const tile = game.board.get(calculatedPosition);
             if(tile) tile.building = b.id;
 
-            // update the building object in the Map in-place
             calculatedSight.forEach(v => b.sight.add(v));
             b.position = calculatedPosition;
 
-            game.buildings.set(buildingId, b);
+            // update tileWatchers
+            calculatedSight.forEach(tileId => {
+                game.tileWatchers.get(tileId).add(socket.id);
+            })
         });
 
         game.resources = game.resources.map(r => {
@@ -1116,12 +1152,8 @@ io.on('connection', (socket) => {
         });
 
         const mainInterval = setInterval(()=>{
-            // Electricity functions
             drainElectricity(game.id);
             generateElectricity(game.id);
-
-            // Check for discovered units and buildings in players sight
-            computePlayersSight(game.id);
 
             if(game.actions.length > 0){
                 resolveActions(game.id);
@@ -1258,8 +1290,10 @@ io.on('connection', (socket) => {
             calculatedSight.forEach(v => unit.sight.add(v));
             unit.position = calculatedPosition;
 
-            // optional
-            game.units.set(unitId, unit);
+            // update tileWatchers
+            calculatedSight.forEach(tileId=>{
+                game.tileWatchers.get(tileId).add(socket.id);
+            })
         });
 
         // calculate sight and position for buildings only for joining player
@@ -1279,7 +1313,10 @@ io.on('connection', (socket) => {
             calculatedSight.forEach(v => building.sight.add(v));
             building.position = calculatedPosition;
 
-            game.buildings.set(buildingId, building);
+            // update tileWatchers
+            calculatedSight.forEach(tileId=>{
+                game.tileWatchers.get(tileId).add(socket.id);
+            })
         })
 
         const safeGameData = { 
